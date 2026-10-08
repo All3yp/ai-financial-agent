@@ -10,6 +10,7 @@ import {
 import { getAllModels } from '../ai/models';
 import { customModel } from '../ai';
 import { validStockSearchFilters } from '../api/stock-filters';
+import { buildAnalysisPrompt, latestHistoricalPricePair } from './analysis-context';
 
 type ScreeningFilter = {
   field: string;
@@ -280,7 +281,7 @@ OUTPUT FORMAT:
   }
 
   async execute(task: AgentTask): Promise<any> {
-    const { researchData, peers = [] } = task.input;
+    const { researchData, peers = [], perspective, instruction } = task.input;
 
     this.updateTaskStatus(task.id, 'running');
 
@@ -299,7 +300,7 @@ OUTPUT FORMAT:
           ),
         );
         peerData = Object.fromEntries(
-          peers.map((p: string, i: number) => [p, peerResults[i].data]),
+          peers.map((p: string, i: number) => [p, peerResults[i].financial_metrics]),
         );
       }
 
@@ -313,14 +314,7 @@ OUTPUT FORMAT:
         name: process.env.OPENAI_PROVIDER_NAME || 'openai',
       });
 
-      const prompt = `Analyze this financial data for ${researchData.ticker}:
-
-RAW DATA:
-${JSON.stringify(researchData, null, 2)}
-
-${Object.keys(peerData).length > 0 ? `PEER DATA:\n${JSON.stringify(peerData, null, 2)}` : ''}
-
-Provide comprehensive analysis in the specified JSON format.`;
+      const prompt = buildAnalysisPrompt({ researchData, peerData, perspective, instruction });
 
       const result = await streamText({
         model: modelInstance,
@@ -538,25 +532,26 @@ OUTPUT FORMAT:
           interval: 'day',
           interval_multiplier: 1,
         });
-        const latestPrice = priceData?.historical?.[0]?.close;
-        const prevPrice = priceData?.historical?.[1]?.close;
+        const pricePair = latestHistoricalPricePair(priceData?.historical?.prices ?? []);
+        const latestPrice = pricePair.latest?.close;
+        const prevPrice = pricePair.previous?.close;
 
         if (latestPrice && prevPrice) {
           const dailyChange = ((latestPrice - prevPrice) / prevPrice) * 100;
           const totalReturn = ((latestPrice - costBasis) / costBasis) * 100;
 
-          if (Math.abs(dailyChange) > (thresholds.dailyMove || 5)) {
+          if (Math.abs(dailyChange) > (thresholds.dailyMove ?? 5)) {
             alerts.push({
               ticker,
               type: 'price_movement',
               severity: Math.abs(dailyChange) > 10 ? 'critical' : 'warning',
-              message: `${ticker} moved ${dailyChange.toFixed(1)}% today`,
-              details: { dailyChange, totalReturn, latestPrice },
+              message: `${ticker} moved ${dailyChange.toFixed(1)}% between the latest available observations`,
+              details: { dailyChange, totalReturn, latestPrice, latestDate: pricePair.latest?.time, previousDate: pricePair.previous?.time },
               action: dailyChange < -10 ? 'review' : 'hold',
             });
           }
 
-          if (totalReturn < (thresholds.maxDrawdown || -20)) {
+          if (totalReturn < (thresholds.maxDrawdown ?? -20)) {
             alerts.push({
               ticker,
               type: 'drawdown',
@@ -576,7 +571,7 @@ OUTPUT FORMAT:
         });
         const latest = metrics?.financial_metrics?.[0];
         if (latest) {
-          if (latest.current_ratio && latest.current_ratio < 1) {
+          if (typeof latest.current_ratio === 'number' && latest.current_ratio < 1) {
             alerts.push({
               ticker,
               type: 'metric_deterioration',

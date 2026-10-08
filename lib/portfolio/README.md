@@ -2,8 +2,10 @@
 
 This is the first, partial Phase 6 slice, not a complete portfolio optimization
 system. All calculations are local arithmetic with existing Zod validation. No
-paid services, credentials, model calls, new dependencies, routes, or tool
-integration are required. The caller supplies prices and scenarios.
+paid services, credentials or model calls are required by the core calculations.
+The caller supplies prices and scenarios. The core is now integrated with a
+shared tool, authenticated REST endpoint, local CLI and quantitative dashboard;
+see the [user guide](../../docs/GUIA_DO_USUARIO.md) for current workflows.
 
 ## API
 
@@ -120,8 +122,9 @@ decimal precision. Historical estimates are descriptive, not guarantees;
 | Pearson correlation and explicit stress scenarios | Implemented here | Local arithmetic; caller-specified shocks |
 | Deterministic structured report | Implemented here | No LLM or API costs |
 | Data acquisition, freshness, calendars and FX | Not implemented | User CSV/export or licensed free-tier data, with limits and adjustments checked |
-| Tool registration, routes and UI | Not implemented | Integrate these pure exports in the main application |
-| Optimization, PCA and factor attribution | Not implemented | Future local numerical-library work with separate model validation; no paid model required |
+| Tool registration, routes and UI | Implemented subset | Shared report tool, authenticated risk/team routes, CLIs and Quantitative dashboard |
+| Optimization, PCA and factor regression | Implemented as separate local models | See optimize.ts and factors.ts; daily-rebalanced factor model is not this fixed-share report |
+| Causal attribution and full strategy team | Not implemented | Requires separate contracts and model validation |
 | Historical crisis replay / backtesting | Not implemented | Actual dated historical data and holdings, not invented shocks |
 
 Free-tier provider availability, licensing, coverage and rate limits must be

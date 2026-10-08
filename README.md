@@ -1,146 +1,148 @@
-# AI Financial Agent 🤖
-This is a proof of conncept AI financial agent.  The goal of this project is to explore the use of AI for investment research.  This project is for **educational** purposes only and is not intended for real trading or investment.
+# AI Financial Agent
 
-👋 **Demo**: You can use a live demo of this project [here](https://chat.financialdatasets.ai/).
+Aplicação de pesquisa financeira com chat, cinco agentes tradicionais e uma equipe quantitativa determinística. Combina consultas externas com cálculos locais de mercado e carteira; não executa ordens nem integra corretora. Uso educacional e de pesquisa, sem garantia de exatidão, disponibilidade ou resultado financeiro.
 
-<img width="1709" alt="Screenshot 2025-01-06 at 5 53 59 PM" src="https://github.com/user-attachments/assets/7ef1729b-f2e1-477c-99e2-1184c1bfa1cd" />
+## Índice
 
-## Disclaimer
+- [Capacidades atuais](#capacidades-atuais)
+- [Documentação](#documentação)
+- [Início rápido](#início-rápido)
+- [Receita quantitativa](#receita-quantitativa)
+- [API e CLI](#api-e-cli)
+- [Comandos de desenvolvimento](#comandos-de-desenvolvimento)
+- [Limites e segurança](#limites-e-segurança)
 
-This project is for **educational and research purposes only**.
+## Capacidades atuais
 
-- Not intended for real trading or investment
-- No warranties or guarantees provided
-- Past performance does not indicate future results
-- Creator assumes no liability for financial losses
-- Consult a financial advisor for investment decisions
+| Caminho | O que faz | Requisitos e limites |
+| --- | --- | --- |
+| Chat em `/` | Pesquisa de preços, demonstrações, métricas e notícias com ferramentas financeiras | Sessão, PostgreSQL, modelo compatível e credenciais de dados; modelos auxiliares e configurações têm limitações |
+| Workflows em `/agents` | Full Analysis, Bull vs Bear Debate, Stock Screening e Portfolio Monitor manual | Research, Analysis, Screener, Monitor e Report; chaves no servidor e Inngest; possível execução duplicada |
+| Quantitative em `/agents` | Regime de mercado, ranking de proxies setoriais, horizontes históricos e risco opcional de carteira | JSON do usuário, quatro especialistas e orquestrador; cálculo sem LLM ou aquisição automática de preços |
+| SEC EDGAR | Filings, fatos XBRL e extração parcial de Business, Risk Factors e MD&A | Contato real, cobertura limitada e avisos; não reconstrói demonstrações completas |
+| FRED | Curva de juros e inflação histórica com vintage `asOf` | Chave do usuário, datas e limites explícitos; sem previsão ou calendário econômico |
+| Ferramentas locais | VaR/CVaR, volatilidade, drawdown, correlações, choques, otimização long-only e PCA/OLS de fatores | Históricos fornecidos; otimização/fatores são ferramentas separadas, não etapas integradas à equipe quantitativa |
 
-By using this software, you agree to use it solely for learning purposes.
+Analysis preserva `financial_metrics` dos peers e aplica perspectiva/instrução bull ou bear, tratando dados de fonte como evidência não confiável. Monitor ordena `historical.prices` por data e compara as duas últimas observações válidas, com datas nos detalhes do alerta, sem alegar movimento de “hoje”; `current_ratio=0` é reconhecido. Relatórios LLM continuam sujeitos a erros.
 
-## Table of Contents 📖
-- [Features](#features)
-- [Setup](#setup)
-- [Run the Agent](#run-the-agent)
-- [Financial Data API](#financial-data-api)
-- [Deploy Your Own Agent](#deploy-your-own-agent)
+Stack: Next.js App Router, React, TypeScript, AI SDK, PostgreSQL/Drizzle, NextAuth, Inngest e `ml-matrix`.
 
-## Features
-- [AI Financial Agent](https://chat.financialdatasets.ai)
-  - Productized version of this project
-  - Chat assistant for financial research, stock analysis, and more
-  - Uses generative UI to display stock prices, fundamentals, and more
-- [Financial Datasets API](https://financialdatasets.ai)
-  - Access to real-time and historical stock market data
-  - Data is optimized for AI financial agents
-  - 30+ years of financial data with 100% market coverage
-  - Documentation available [here](https://docs.financialdatasets.ai)
-- **Multi-Provider Support** 🔄
-  - Configure multiple OpenAI-compatible providers (OpenAI, Together.ai, Groq, OpenRouter, etc.)
-  - Switch between providers instantly in the chat header
-  - Each provider has its own API key, base URL, and model selection
-  - Add custom models for each provider
-  - Manage all providers through the API Keys modal
+## Documentação
 
-## Setup
+- [Guia do usuário](docs/GUIA_DO_USUARIO.md): instalação, privacidade, chat, workflows, JSON quantitativo, comandos, API e troubleshooting.
+- [Arquitetura e agentes](docs/ARQUITETURA_E_AGENTES.md): contratos, execução, matemática, fontes, limitações e backlog.
+- [Verificação local](docs/VALIDACAO.md): testes, build, validação visual e o que não foi confirmado ao vivo.
+- [Exemplos e advertências](docs/exemplos/README.md): uso da única [fixture quantitativa completa](docs/exemplos/quantitative-fixture.json), com mercado e carteira sintéticos.
 
-```bash
-git clone https://github.com/virattt/ai-financial-agent.git
-cd ai-financial-agent
-```
+## Início rápido
 
-> If you do not have npm installed, please install it from [here](https://nodejs.org/en/download/).
+### 1. Instalar dependências
 
-1. Install pnpm (if not already installed):
-```bash
-npm install -g pnpm
-```
+Na raiz do repositório, use Node.js compatível com Next.js 15 (20 ou 22 são opções práticas), pnpm e PostgreSQL acessível. O projeto não impõe uma versão de Node via `engines`.
 
-2. Install dependencies:
-```bash
+```sh
 pnpm install
 ```
 
-3. Set up your environment variables:
-```bash
-# Create .env file for your API keys
-cp .env.example .env
+### 2. Configurar o ambiente
+
+O [helper de ambiente](scripts/setup-env.mjs) escreve `.env`, gera `AUTH_SECRET` e configura contato para a SEC, preservando valores existentes:
+
+```sh
+env SEC_CONTACT_EMAIL='SEU_EMAIL_REAL' node scripts/setup-env.mjs
 ```
 
-Set the API keys in the .env file:
-```
-# Get your OpenAI API key from https://platform.openai.com/
-OPENAI_API_KEY=your-openai-api-key
+**Substitua `SEU_EMAIL_REAL` por contato válido e monitorado.** O placeholder não é válido; o helper também pode usar contato do Git ou perguntar interativamente. A identificação SEC é requisito desse helper, não do cálculo quantitativo via CLI. Revise `POSTGRES_URL` e credenciais: o helper não cria o banco nem substitui automaticamente URL/chaves já existentes e vazias. Seus padrões locais não são credenciais de produção.
 
-# Optional: Base URL for OpenAI-compatible providers (e.g., Together.ai, Groq, etc.)
-# Leave empty for default OpenAI API
-OPENAI_BASE_URL=
+Alternativa manual: use [.env.example](.env.example) como referência, configure `.env` ou `.env.local`, gere um `AUTH_SECRET` forte (por exemplo, `openssl rand -base64 32`) e preencha `POSTGRES_URL` com usuário, senha, host e banco reais. Para consultas SEC, configure `SEC_USER_AGENT` com nome da aplicação e contato real; [.env.sec.example](.env.sec.example) é somente placeholder e não é carregado automaticamente. O template não lista todas as variáveis hoje suportadas; consulte a [tabela completa do guia](docs/GUIA_DO_USUARIO.md#23-variáveis-por-finalidade).
 
-# Optional: Custom provider name for identification
-OPENAI_PROVIDER_NAME=
+Para workflows tradicionais, configure `OPENAI_API_KEY`, `OPENAI_BASE_URL` e `OPENAI_PROVIDER_NAME` no servidor. Para dados, use `FINANCIAL_DATA_PROVIDER` e as chaves aplicáveis: `FMP_API_KEY`, `ALPHA_VANTAGE_API_KEY`, `TWELVE_DATA_API_KEY` ou `FINANCIAL_DATASETS_API_KEY`. Screener por filtros exige Financial Datasets. FRED usa `FRED_API_KEY`; upload de imagens usa `BLOB_READ_WRITE_TOKEN`. Não publique segredos nem versione arquivos de ambiente.
 
-# Get your Financial Datasets API key from https://financialdatasets.ai/
-FINANCIAL_DATASETS_API_KEY=your-financial-datasets-api-key
+O [instalador local](setup-local.sh) é opcional:
 
-# Get your LangSmith API key from https://smith.langchain.com/
-LANGCHAIN_API_KEY=your-langsmith-api-key
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_PROJECT=ai-financial-agent
+```sh
+env SEC_CONTACT_EMAIL='SEU_EMAIL_REAL' bash setup-local.sh
 ```
 
-### Multi-Provider Configuration (Optional)
+Ele pode pedir `sudo`, depende da distribuição e não garante senha/autenticação PostgreSQL. Confira os [limites do instalador](docs/GUIA_DO_USUARIO.md#25-instalador-opcional) antes de executá-lo.
 
-You can configure multiple OpenAI-compatible providers through the UI:
+### 3. Preparar banco e iniciar
 
-1. **Open the API Keys modal** (click the key icon in the chat header)
-2. **Click "Add Provider"** to add a new provider
-3. **Enter provider details**:
-   - **Name**: Display name (e.g., "Together.ai", "Groq", "OpenRouter")
-   - **API Key**: Your provider's API key
-   - **Base URL**: The provider's OpenAI-compatible endpoint (e.g., `https://api.together.xyz/v1`)
-4. **Switch providers** using the provider selector in the chat header
-5. **Add custom models** for each provider in the same modal
+Crie banco e usuário PostgreSQL, configure `POSTGRES_URL` e execute na raiz:
 
-**Popular OpenAI-compatible providers:**
-- **Together.ai**: `https://api.together.xyz/v1` - Llama, Mixtral, Qwen models
-- **Groq**: `https://api.groq.com/openai/v1` - Fast inference for Llama, Mixtral
-- **OpenRouter**: `https://openrouter.ai/api/v1` - Access to 100+ models
-- **Fireworks AI**: `https://api.fireworks.ai/inference/v1` - Various open models
-- **Anyscale**: `https://api.endpoints.anyscale.com/v1` - Ray Serve models
-- **Local (LM Studio/Ollama)**: `http://localhost:1234/v1` - Run models locally
-
-**Important**: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
-
-## Run the Agent
-
-After completing the steps above, simply run the following command to start the development server:
-```bash
+```sh
+pnpm db:migrate
 pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000/).
+Abra `http://localhost:3000/` para chat e `http://localhost:3000/agents` para workflows e Quantitative. Use a porta anunciada pelo Next se a 3000 estiver ocupada. Conversas existentes ficam em `/chat/{id}`, não em uma página `/chat`.
 
-## Financial Data API
+A sessão é gerada automaticamente por cookie `fingerprint` e usuário no banco. Isso não é autenticação convencional endurecida: os formulários de login/cadastro não validam a senha na autorização atual. Não exponha a instalação a usuários não confiáveis sem revisão de identidade e permissões.
 
-This template uses the [Financial Datasets API](https://financialdatasets.ai) as the financial data provider.  The Financial Datasets API is specifically designed for AI financial agents and LLMs.
+### 4. Inngest e chaves do chat
 
-The Financial Datasets API provides real-time and historical stock market data and covers 100% of the US market over the past 30 years.  
+Para workflows, configure `INNGEST_DEV=1` no ambiente local da aplicação quando necessário e reinicie-a. Em outro terminal:
 
-Data includes financial statements, stock prices, options data, insider trades, institutional ownership, and much more.  You can learn more about the API via the documentation [here](https://docs.financialdatasets.ai).
+```sh
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+```
 
-**Note**: Data is free for AAPL, GOOGL, MSFT, NVDA, and TSLA.
+O painel local normalmente fica em `http://localhost:8288`; confira as URLs da CLI, que pode ser baixada por `npx`. Operação hospedada requer event/signing keys e configuração do serviço. O trigger aguarda envio do evento antes da execução HTTP e pode executar novamente pelo consumidor Inngest.
 
-If you do not want to use the Financial Datasets API, you can easily switch to another data provider by modifying a few lines of code.
+No menu do usuário, abra `Configure API keys` para cadastrar provedor OpenAI-compatible e modelos. As chaves do chat são enviadas pelo navegador; configurar `OPENAI_*` no servidor não equivale a configurar esse cadastro. O catálogo do servidor e os modelos auxiliares restringem compatibilidade: adicionar um modelo personalizado não basta. O gate de envio ainda usa chave legada local, e a seleção visual de provedor não garante sincronização da chave efetivamente enviada. Veja o [guia de configuração](docs/GUIA_DO_USUARIO.md#41-configurar-modelo-e-dados).
 
-## Deploy Your Own Agent
+## Receita quantitativa
 
-You can deploy your own version of the AI Financial Agent in production via Vercel with one click:
+Com dependências instaladas, execute a receita testada, sem banco, sessão, rede ou chaves de LLM para o cálculo:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvirattt%2Fai-financial-agent&env=AUTH_SECRET,OPENAI_API_KEY&envDescription=Learn%20more%20about%20how%20to%20get%20the%20API%20Keys%20for%20the%20application&envLink=https%3A%2F%2Fgithub.com%2Fvercel%2Fai-financial-agent%2Fblob%2Fmain%2F.env.example&demo-title=AI%20Financial%20Agent&demo-description=An%20open-source%20financial%20agent%20chat%20template%20built%20with%20the%20AI%20SDK%20by%20Vercel%20and%20Financial%20Datasets%20API.&demo-url=https%3A%2F%2Fchat.vercel.ai&stores=[{%22type%22:%22postgres%22},{%22type%22:%22blob%22}])
+```sh
+pnpm agent:analyze --input docs/exemplos/quantitative-fixture.json --mode=quantitative
+```
 
-If you want to deploy your own version of the AI Financial Agent in production, you need to link your local instance with your Vercel and GitHub accounts.
+A [fixture](docs/exemplos/quantitative-fixture.json) contém mercado e carteira: 21 datas comuns, de 2026-09-01 a 2026-09-21, para **20 retornos**. Define horizontes `[5,10,20]` e janelas de regime/volatilidade de 20 explicitamente; uma janela de 20 exige 21 preços. Sem essa configuração, os defaults de mercado exigem 201 datas.
 
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
+**Não contém dados financeiros reais.** Preços e tickers são fictícios; há fins de semana, não sessões reais de mercado. A amostra mínima produz aviso de poucos retornos e não valida anualização, sinais ou performance. Leia as [advertências dos exemplos](docs/exemplos/README.md). Não há fixture separada de carteira.
+
+Para testar a interface, abra `/agents`, selecione `Quantitative`, escolha esse JSON e clique em `Analyze`. Confira conflitos, warnings e limitations; o download preserva a saída completa. O navegador exige sessão e banco, embora o cálculo não use LLM. Nenhum upload cadastra uma carteira persistente.
+
+## API e CLI
+
+| Entrada | Contrato |
+| --- | --- |
+| `POST /api/agents/quantitative` | `{market, portfolio?}`; sessão, JSON UTF-8 até 1 MiB; resposta calculada direta |
+| `POST /api/portfolio/risk` | Objeto de carteira isolado; sessão, mesmo limite de 1 MiB; resposta direta |
+| `POST /api/agents/trigger` | `{workflowType,data}` com `analysis`, `debate`, `screening` ou `monitoring`; envelope `success/data` |
+| `pnpm agent:analyze --input arquivo --mode=quantitative` | Equipe quantitativa; modo opcional, somente `quantitative` |
+| `pnpm portfolio:report /caminho/portfolio.json` | Apenas objeto de carteira, não a fixture inteira da equipe; um argumento posicional |
+
+As CLIs leem JSON local e não adquirem preços, migram banco ou executam modelo. Para stdout somente JSON, use `pnpm exec tsx scripts/agent-analyze.ts --input docs/exemplos/quantitative-fixture.json --mode=quantitative`; scripts pnpm podem imprimir cabeçalhos. Schemas, limites e exemplos curl com cookies de sessão legítima estão no [guia completo](docs/GUIA_DO_USUARIO.md#8-comandos-e-api). Não existe tipo `quantitative` no trigger tradicional nem API pública dedicada a otimização/fatores; estes são tools locais do chat.
+
+## Comandos de desenvolvimento
+
+Conforme [package.json](package.json):
+
+| Comando | Efeito |
+| --- | --- |
+| `pnpm test` | Testes locais, incluindo mocks/fixtures; não certificam provedores ao vivo |
+| `pnpm typecheck` | TypeScript sem emissão |
+| `pnpm build:app` | Somente `next build`; avaliação de rotas ainda pode depender do ambiente |
+| `pnpm build` | **Migra o banco configurado antes de `next build`** |
+| `pnpm db:migrate` | Aplica migrações existentes |
+| `pnpm dev` | Servidor Next em desenvolvimento |
+| `pnpm start` | Servidor de produção após build |
+| `pnpm lint`, `pnpm lint:fix`, `pnpm format` | Podem escrever arquivos; não são verificações apenas de leitura |
+
+O [migrador](lib/db/migrate.ts) carrega `.env.local` e depois `.env` sem override; ambiente exportado tem prioridade. Drizzle Kit, via [drizzle.config.ts](drizzle.config.ts), carrega somente `.env.local`: `db:generate/studio/push/pull/check/up` podem precisar da URL exportada ou nesse arquivo. Execute na raiz e controle backups/migrações antes de build ou mudanças de schema.
+
+## Limites e segurança
+
+- Cobertura, preços ajustados, histórico, cotas e custos dependem de provedor e plano. Twelve Data só fornece preços neste adaptador; Alpha Vantage tem histórico compact e restrições de fundamentos. Não há promessa de cobertura universal ou dados gratuitos. Modelos fixos e sufixos `:free` não garantem disponibilidade/gratuidade.
+- Chaves manuais ficam em `localStorage`, sem cofre criptografado, e são transmitidas ao servidor/provedor. Trate-as como sensíveis a scripts da origem, extensões e XSS. Use HTTPS, escopo mínimo e rotação; avalie logs/tracing e destinos de dados.
+- PostgreSQL guarda conteúdo de chat; conversas públicas são compartilháveis e imagens no Blob são públicas. Identidade automática não constitui isolamento multiusuário endurecido. Audite autorização, propriedade, retenção e exclusão antes de produção.
+- `History`, status dos cards e configuração de alertas no dashboard têm placeholders. Crons não têm timezone explícito/feriados e monitoramento agendado ainda busca carteiras vazias; notificações e persistência de workflows não estão prontas.
+- O stream do chat está conectado e preserva pergunta/anexos; falha após texto parcial requer nova tentativa sem misturar um fallback. O DELETE chamado pelo histórico ainda não tem handler na rota. Execução dupla tradicional, modelos auxiliares fixos, perda de metadados no Research e memória por processo permanecem limitações reais. Consulte o [backlog atual](docs/ARQUITETURA_E_AGENTES.md#10-limitações-e-backlog).
+- Não há ordens, importação persistente de carteira, forecast quantitativo, replay automático de crises ou certificação de calendários/ajustes. Cálculos históricos e interpretações LLM não são aconselhamento financeiro nem garantia de retornos futuros.
+
+Código sob [Apache-2.0](LICENSE); a licença não concede direitos sobre dados, notícias ou serviços externos. Verifique termos SEC/FRED, licenciamento e credenciais por usuário aplicáveis antes de operar.
 
 

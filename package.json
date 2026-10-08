@@ -8,7 +8,7 @@
     "start": "next start",
     "portfolio:report": "tsx scripts/portfolio-report.ts",
     "agent:analyze": "tsx scripts/agent-analyze.ts",
-    "test": "tsx --test lib/api/*.test.ts lib/ai/tools/*.test.ts lib/agents/*.test.ts lib/portfolio/*.test.ts lib/market/*.test.ts scripts/*.test.ts scripts/*.test.mjs",
+    "test": "tsx --test lib/api/*.test.ts lib/ai/*.test.ts lib/ai/tools/*.test.ts lib/agents/*.test.ts lib/portfolio/*.test.ts lib/market/*.test.ts scripts/*.test.ts scripts/*.test.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "build:app": "next build",
     "lint": "next lint && biome lint --write --unsafe",

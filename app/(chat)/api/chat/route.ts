@@ -6,6 +6,7 @@ import {
   streamText,
 } from 'ai';
 import { z } from 'zod';
+import { appendChatTasks, streamChatResult } from '@/lib/ai/chat-stream';
 import {
   financialDataConfigSchema,
   hasFinancialDataCredentials,
@@ -238,19 +239,7 @@ export async function POST(request: Request) {
       let receivedFirstChunk = false;
 
       // Create a transient version of coreMessages with task names
-      const coreMessagesWithTaskNames = [...coreMessages];
-      const lastMessage =
-        coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1];
-      if (
-        coreMessagesWithTaskNames.length > 0 &&
-        lastMessage?.role === 'user'
-      ) {
-        const taskList = object.map((task) => task.task_name).join('\n');
-        coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1] = {
-          role: 'user',
-          content: taskList,
-        };
-      }
+      const coreMessagesWithTaskNames = appendChatTasks(coreMessages, object.map((task) => task.task_name));
 
       // Try each model in sequence until one succeeds
       const lastErrorState: { error: Error | null } = { error: null };
@@ -277,6 +266,7 @@ export async function POST(request: Request) {
         });
 
         const modelErrorState: { error: Error | null } = { error: null };
+        let emittedModelContent = false;
         let finishResolve: () => void;
         const finishPromise = new Promise<void>((resolve) => {
           finishResolve = resolve;
@@ -289,6 +279,7 @@ export async function POST(request: Request) {
           messages: coreMessagesWithTaskNames,
           maxSteps: 10,
           onChunk: (event) => {
+            if (event.chunk.type === 'text-delta' || event.chunk.type === 'tool-call') emittedModelContent = true;
             const isToolCall = event.chunk.type === 'tool-call';
             if (!receivedFirstChunk && !isToolCall) {
               receivedFirstChunk = true;
@@ -339,7 +330,7 @@ export async function POST(request: Request) {
             finishResolve();
           },
         });
-        result.text.catch((error: unknown) => {
+        streamChatResult(result, dataStream).catch((error: unknown) => {
           const modelError =
             error instanceof Error ? error : new Error(String(error));
           modelErrorState.error = modelError;
@@ -373,6 +364,11 @@ export async function POST(request: Request) {
             error: modelErrorState.error.message,
           },
         });
+
+        if (emittedModelContent) {
+          dataStream.writeData({ type: 'error', content: { message: 'Model stream failed after partial content. Retry the request.', code: 'PARTIAL_MODEL_FAILURE' } });
+          return;
+        }
 
         // Continue to next model
         continue;

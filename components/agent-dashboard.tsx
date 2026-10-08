@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { QuantitativeDashboard } from '@/components/quantitative-dashboard';
 import { 
   Play, 
   RefreshCw, 
@@ -172,13 +173,14 @@ export function AgentDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="workflows">
             <Play className="w-4 h-4 mr-2" /> Workflows
           </TabsTrigger>
           <TabsTrigger value="agents">
             <Brain className="w-4 h-4 mr-2" /> Agents
           </TabsTrigger>
+          <TabsTrigger value="quantitative"><Brain className="mr-2 size-4" />Quantitative</TabsTrigger>
           <TabsTrigger value="monitoring">
             <Bell className="w-4 h-4 mr-2" /> Monitoring
           </TabsTrigger>
@@ -365,6 +367,8 @@ export function AgentDashboard() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="quantitative"><QuantitativeDashboard /></TabsContent>
 
         {/* AGENTS TAB */}
         <TabsContent value="agents" className="space-y-4">

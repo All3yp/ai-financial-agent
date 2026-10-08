@@ -1,0 +1,44 @@
+{
+  "market": {
+    "marketTicker": "TEST_MARKET",
+    "sectorTickers": ["TEST_SECTOR"],
+    "priceBasis": "ADJUSTED_PRICE",
+    "asOf": "2026-09-21",
+    "horizons": [5, 10, 20],
+    "config": { "regimeWindow": 20, "volatilityWindow": 20 },
+    "histories": [
+      { "ticker": "TEST_MARKET", "prices": [
+        {"date":"2026-09-01","price":100},{"date":"2026-09-02","price":101},{"date":"2026-09-03","price":102},
+        {"date":"2026-09-04","price":103},{"date":"2026-09-05","price":104},{"date":"2026-09-06","price":105},
+        {"date":"2026-09-07","price":106},{"date":"2026-09-08","price":107},{"date":"2026-09-09","price":108},
+        {"date":"2026-09-10","price":109},{"date":"2026-09-11","price":110},{"date":"2026-09-12","price":111},
+        {"date":"2026-09-13","price":112},{"date":"2026-09-14","price":113},{"date":"2026-09-15","price":114},
+        {"date":"2026-09-16","price":115},{"date":"2026-09-17","price":116},{"date":"2026-09-18","price":117},
+        {"date":"2026-09-19","price":118},{"date":"2026-09-20","price":119},{"date":"2026-09-21","price":120}
+      ]},
+      { "ticker": "TEST_SECTOR", "prices": [
+        {"date":"2026-09-01","price":100},{"date":"2026-09-02","price":102},{"date":"2026-09-03","price":104},
+        {"date":"2026-09-04","price":106},{"date":"2026-09-05","price":108},{"date":"2026-09-06","price":110},
+        {"date":"2026-09-07","price":112},{"date":"2026-09-08","price":114},{"date":"2026-09-09","price":116},
+        {"date":"2026-09-10","price":118},{"date":"2026-09-11","price":120},{"date":"2026-09-12","price":122},
+        {"date":"2026-09-13","price":124},{"date":"2026-09-14","price":126},{"date":"2026-09-15","price":128},
+        {"date":"2026-09-16","price":130},{"date":"2026-09-17","price":132},{"date":"2026-09-18","price":134},
+        {"date":"2026-09-19","price":136},{"date":"2026-09-20","price":138},{"date":"2026-09-21","price":140}
+      ]}
+    ]
+  },
+  "portfolio": {
+    "currency": "USD",
+    "positions": [{ "ticker": "TEST_ASSET", "shares": 2, "currentPrice": 72 }],
+    "histories": [{ "ticker": "TEST_ASSET", "prices": [
+      {"date":"2026-09-01","price":100},{"date":"2026-09-02","price":80},{"date":"2026-09-03","price":72},
+      {"date":"2026-09-04","price":72},{"date":"2026-09-05","price":72},{"date":"2026-09-06","price":72},
+      {"date":"2026-09-07","price":72},{"date":"2026-09-08","price":72},{"date":"2026-09-09","price":72},
+      {"date":"2026-09-10","price":72},{"date":"2026-09-11","price":72},{"date":"2026-09-12","price":72},
+      {"date":"2026-09-13","price":72},{"date":"2026-09-14","price":72},{"date":"2026-09-15","price":72},
+      {"date":"2026-09-16","price":72},{"date":"2026-09-17","price":72},{"date":"2026-09-18","price":72},
+      {"date":"2026-09-19","price":72},{"date":"2026-09-20","price":72},{"date":"2026-09-21","price":72}
+    ]}],
+    "scenarios": [{ "name": "Explicit test shock", "returns": { "TEST_ASSET": -0.2 } }]
+  }
+}

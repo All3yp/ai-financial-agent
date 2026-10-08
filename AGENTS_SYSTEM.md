@@ -2,6 +2,11 @@
 
 ## Overview
 
+User-facing documentation: [User Guide](docs/GUIA_DO_USUARIO.md),
+[Architecture And Agents](docs/ARQUITETURA_E_AGENTES.md), and
+[Runnable Fixture Instructions](docs/exemplos/README.md). These guides describe
+commands, inputs, actual agent execution, privacy and current limitations.
+
 This project implements an **autonomous multi-agent financial analysis system** built on Next.js 15, Inngest (background jobs), and OpenRouter (free tier models).
 
 ---
@@ -79,7 +84,7 @@ This project implements an **autonomous multi-agent financial analysis system** 
 
 | Agent | Model | Specialty | Tools |
 |-------|-------|-----------|-------|
-| **Research** | `apodex/apodex-1.1-mini:free` | Evidence-grounded research, 262K context | All 6 financial tools |
+| **Research** | Configured model ID; execute does not call it | Deterministic prices, statements and metrics gathering | Five data tools |
 | **Analysis** | `thinkingmachines/inkling:free` | Deep valuation, multimodal, 1M context | Financial metrics (peers) |
 | **Screener** | `nvidia/nemotron-3.5-lightning:free` | High-throughput screening, 1M context | Screener + metrics |
 | **Monitor** | `meta-llama/llama-3.1-8b-instruct:free` | Fast position monitoring | Prices, metrics, income |
@@ -339,7 +344,8 @@ The broader checkboxes remain open because their full planned scope is not done.
 - [x] Connect risk reports to chat/agent tools (`generatePortfolioReport`)
 - [x] Authenticated REST API: `POST /api/portfolio/risk`
 - [x] Local CLI: `pnpm portfolio:report input.json`
-- [ ] Dashboard risk widgets and sourced-history acquisition
+- [x] Quantitative dashboard with JSON upload, regime/horizons/sector rankings, optional risk metrics, conflicts and report export
+- [ ] Sourced-history acquisition and persistent portfolio ingestion
 
 The shared risk tool, REST API and CLI reuse strict validation and never call
 models or generate stress scenarios. Inputs require `positions`, `histories`,
@@ -424,6 +430,7 @@ modes, FIIs, live sourced-history acquisition and schedules remain pending.
 - [x] Quantitative team CLI: `pnpm agent:analyze --input input.json --mode=quantitative`
 - [ ] **Background Workers** - Continuous monitoring, auto-rebalancing signals
 - [ ] **Dashboard Widgets** - Real-time regime, allocation, risk metrics
+- [x] Manual dated quantitative/risk widgets in `/agents` Quantitative tab (not real-time allocation or streaming)
 
 ### Phase 9: Infrastructure & Observability
 
@@ -540,7 +547,7 @@ lib/
 │   ├── model-catalog.ts  # ALL OpenRouter free models (22)
 │   ├── models.ts         # Custom models + getAllModels()
 │   └── tools/
-│       └── financial-tools.ts  # 7 financial tools
+│       └── financial-tools.ts  # External data and deterministic research tools
 app/
 ├── api/
 │   ├── inngest/route.ts          # Inngest webhook endpoint
@@ -590,7 +597,7 @@ SEC connectivity, deployment readiness or end-to-end model execution.
 - Webhook destinations, production storage/cache/vector credentials and deployment
   configuration are not provided. Infrastructure placeholders are not deployed.
 - Remaining local work is still backlog, not an external blocker: extended
-  optimization constraints, causal attribution, strategy/allocation agents, dashboard widgets, persistent
+  optimization constraints, causal attribution, strategy/allocation agents, real-time dashboard updates, persistent
   portfolio ingestion and a full evaluation framework are not complete.
 
 1. **Test current system**: `pnpm dev` + `npx inngest-cli dev` → `/agents`
