@@ -6,6 +6,7 @@ export interface ModelProviderConfig {
   apiKey: string;
   baseURL?: string;
   isDefault?: boolean;
+  enabledModelIds?: string[]; // Optional: list of model IDs enabled for this provider
 }
 
 const PROVIDERS_STORAGE_KEY = 'modelProviders';

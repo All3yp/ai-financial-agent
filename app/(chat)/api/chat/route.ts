@@ -38,11 +38,25 @@ export const maxDuration = 60;
 
 const allTools: AllowedTools[] = [...financialTools];
 
+// Type for model configuration with fallback support
+interface ModelConfig {
+  id: string;
+  apiIdentifier: string;
+  apiKey: string;
+  baseURL?: string;
+  providerName?: string;
+}
+
+interface ModelFallbackConfig {
+  models: ModelConfig[];
+}
+
 export async function POST(request: Request) {
   const {
     id,
     messages,
     modelId,
+    modelFallback,
     financialDatasetsApiKey,
     modelApiKey,
     modelBaseURL,
@@ -51,6 +65,7 @@ export async function POST(request: Request) {
     id: string;
     messages: Array<Message>;
     modelId: string;
+    modelFallback?: ModelFallbackConfig;
     financialDatasetsApiKey?: string;
     modelApiKey?: string;
     modelBaseURL?: string;
@@ -63,10 +78,37 @@ export async function POST(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const model = models.find((model) => model.id === modelId);
+  // Build the list of models to try (primary + fallbacks)
+  const modelsToTry: ModelConfig[] = [];
+  
+  // Add primary model
+  const primaryModel = models.find((m) => m.id === modelId);
+  if (!primaryModel) {
+    return new Response('Primary model not found', { status: 404 });
+  }
+  
+  modelsToTry.push({
+    id: primaryModel.id,
+    apiIdentifier: primaryModel.apiIdentifier,
+    apiKey: modelApiKey!,
+    baseURL: modelBaseURL,
+    providerName: modelProviderName,
+  });
 
-  if (!model) {
-    return new Response('Model not found', { status: 404 });
+  // Add fallback models if provided
+  if (modelFallback?.models?.length) {
+    for (const fallback of modelFallback.models) {
+      const model = models.find((m) => m.id === fallback.id);
+      if (model) {
+        modelsToTry.push({
+          id: model.id,
+          apiIdentifier: model.apiIdentifier,
+          apiKey: fallback.apiKey,
+          baseURL: fallback.baseURL,
+          providerName: fallback.providerName,
+        });
+      }
+    }
   }
 
   if (!modelApiKey) {
@@ -172,7 +214,6 @@ export async function POST(request: Request) {
 
       // Create a transient version of coreMessages with task names
       const coreMessagesWithTaskNames = [...coreMessages];
-      // Replace the last user message content with task names
       const lastMessage = coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1];
       if (coreMessagesWithTaskNames.length > 0 && lastMessage?.role === 'user') {
         const taskList = object.map(task => task.task_name).join('\n');
@@ -182,100 +223,140 @@ export async function POST(request: Request) {
         };
       }
 
-      const result = streamText({
-        model: customModel(model.apiIdentifier, { apiKey: modelApiKey, baseURL: modelBaseURL, name: modelProviderName }),
-        tools: financialToolsManager.getTools(),
-        system: systemPrompt,
-        messages: coreMessagesWithTaskNames,
-        maxSteps: 10,
-        onChunk: (event) => {
-          const isToolCall = event.chunk.type === 'tool-call';
-          if (!receivedFirstChunk && !isToolCall) {
-            receivedFirstChunk = true;
-            // Set query-loading to false on first token
-            dataStream.writeData({
-              type: 'query-loading',
-              content: {
-                isLoading: false,
-                taskNames: []
-              }
-            });
+      // Try each model in sequence until one succeeds
+      const lastErrorState: { error: Error | null } = { error: null };
+      
+      for (let i = 0; i < modelsToTry.length; i++) {
+        const modelConfig = modelsToTry[i];
+        const isFallback = i > 0;
+        
+        // Notify client which model is being tried
+        dataStream.writeData({
+          type: 'model-attempt',
+          content: {
+            modelId: modelConfig.id,
+            isFallback,
+            attemptNumber: i + 1,
+            totalAttempts: modelsToTry.length,
           }
-        },
-        onFinish: async ({ response }) => {
-          // CAUTION: this is a hack to prevent stream from being cut off :(
-          // TODO: find a better solution
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+        });
 
-          // save the response
-          if (session.user?.id) {
-            try {
+        const modelInstance = customModel(modelConfig.apiIdentifier, {
+          apiKey: modelConfig.apiKey,
+          baseURL: modelConfig.baseURL,
+          name: modelConfig.providerName,
+        });
+        
+        const modelErrorState: { error: Error | null } = { error: null };
+        let finishResolve: () => void;
+        const finishPromise = new Promise<void>((resolve) => {
+          finishResolve = resolve;
+        });
+        
+        const result = streamText({
+          model: modelInstance,
+          tools: financialToolsManager.getTools(),
+          system: systemPrompt,
+          messages: coreMessagesWithTaskNames,
+          maxSteps: 10,
+          onChunk: (event) => {
+            const isToolCall = event.chunk.type === 'tool-call';
+            if (!receivedFirstChunk && !isToolCall) {
+              receivedFirstChunk = true;
+              dataStream.writeData({
+                type: 'query-loading',
+                content: {
+                  isLoading: false,
+                  taskNames: []
+                }
+              });
+            }
+          },
+          onFinish: async ({ response }) => {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            if (session.user?.id) {
               const responseMessagesWithoutIncompleteToolCalls = sanitizeResponseMessages(response.messages);
 
               if (responseMessagesWithoutIncompleteToolCalls.length > 0) {
-                await saveMessages({
-                  messages: responseMessagesWithoutIncompleteToolCalls.map(
-                    (message) => {
-                      const messageId = generateUUID();
+                try {
+                  await saveMessages({
+                    messages: responseMessagesWithoutIncompleteToolCalls.map(
+                      (message) => {
+                        const messageId = generateUUID();
 
-                      if (message.role === 'assistant') {
-                        dataStream.writeMessageAnnotation({
-                          messageIdFromServer: messageId,
-                        });
+                        if (message.role === 'assistant') {
+                          dataStream.writeMessageAnnotation({
+                            messageIdFromServer: messageId,
+                          });
+                        }
+
+                        return {
+                          id: messageId,
+                          chatId: id,
+                          role: message.role,
+                          content: message.content,
+                          createdAt: new Date(),
+                        };
                       }
-
-                      return {
-                        id: messageId,
-                        chatId: id,
-                        role: message.role,
-                        content: message.content,
-                        createdAt: new Date(),
-                      };
-                    },
-                  ),
-                });
-              } else {
-                console.log('No valid messages to save');
+                    ),
+                  });
+                } catch (error) {
+                  console.error('Failed to save chat:', error);
+                }
               }
-            } catch (error) {
-              console.error('Failed to save chat:', error);
             }
+            finishResolve();
+          },
+        });
+        result.text.catch((error: unknown) => {
+          const modelError = error instanceof Error ? error : new Error(String(error));
+          modelErrorState.error = modelError;
+          lastErrorState.error = modelError;
+          console.error(`Model ${modelConfig.id} failed:`, modelError);
+          finishResolve();
+        });
+        // Wait for onFinish to complete
+        await finishPromise;
+        
+        // Check if model succeeded
+        if (!modelErrorState.error) {
+          // Notify success
+          dataStream.writeData({
+            type: 'model-success',
+            content: {
+              modelId: modelConfig.id,
+              isFallback,
+            }
+          });
+          
+          return; // Exit the loop on success
+        }
+        
+        // Model failed, notify and continue to next
+        dataStream.writeData({
+          type: 'model-failed',
+          content: {
+            modelId: modelConfig.id,
+            isFallback,
+              error: modelErrorState.error.message,
           }
-        },
-      });
+        });
+        
+        // Continue to next model
+        continue;
+      }
 
-      result.mergeIntoDataStream(dataStream);
+      // If all models failed
+      if (lastErrorState.error) {
+        dataStream.writeData({
+          type: 'error',
+          content: {
+            message: `All models failed. Last error: ${lastErrorState.error.message}`,
+            code: 'ALL_MODELS_FAILED',
+          }
+        });
+      }
     },
   });
-}
-
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return new Response('Not Found', { status: 404 });
-  }
-
-  const session = await auth();
-
-  if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  try {
-    const chat = await getChatById({ id });
-
-    if (chat.userId !== session.user.id) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    await deleteChatById({ id });
-
-    return new Response('Chat deleted', { status: 200 });
-  } catch (error) {
-    return new Response('An error occurred while processing your request', {
-      status: 500,
-    });
-  }
 }

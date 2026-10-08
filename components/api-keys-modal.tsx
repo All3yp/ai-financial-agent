@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye, EyeOff, Plus, Trash2, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { 
   getProviders, 
   addProvider, 
@@ -18,9 +19,132 @@ import {
   setFinancialDatasetsApiKey
 } from '@/lib/db/api-keys';
 import { validateOpenAIKey } from '@/lib/utils/api-key-validation';
-import { addCustomModel, removeCustomModel, getCustomModels, Model } from '@/lib/ai/models';
+import { addCustomModel, removeCustomModel, getCustomModels, Model, getAllModels } from '@/lib/ai/models';
 import { ModelProviderConfig } from '@/lib/db/api-keys';
+import { cn } from '@/lib/utils';
 
+
+// Provider Models Section Component
+function ProviderModelsSection({
+  provider,
+  defaultProviderId,
+  onSetDefault,
+  onRemove,
+  onUpdate,
+}: {
+  provider: ModelProviderConfig;
+  defaultProviderId: string;
+  onSetDefault: (id: string) => void;
+  onRemove: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<ModelProviderConfig>) => void;
+}) {
+  const [showModels, setShowModels] = useState(false);
+  const allModels = getAllModels(provider.id);
+  const enabledModelIds = provider.enabledModelIds || [];
+  
+  const handleToggleModel = (modelId: string) => {
+    const newEnabled = enabledModelIds.includes(modelId)
+      ? enabledModelIds.filter(id => id !== modelId)
+      : [...enabledModelIds, modelId];
+    onUpdate(provider.id, { enabledModelIds: newEnabled });
+  };
+  
+  const handleSelectAll = () => {
+    if (enabledModelIds.length === allModels.length) {
+      onUpdate(provider.id, { enabledModelIds: [] });
+    } else {
+      onUpdate(provider.id, { enabledModelIds: allModels.map(m => m.id) });
+    }
+  };
+  
+  const isAllSelected = enabledModelIds.length === allModels.length && allModels.length > 0;
+  const isSomeSelected = enabledModelIds.length > 0 && enabledModelIds.length < allModels.length;
+
+  return (
+    <div>
+      <div 
+        key={provider.id} 
+        className={`flex items-center justify-between p-3 border rounded ${
+          provider.id === defaultProviderId ? 'border-primary bg-primary/5' : ''
+        }`}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <RadioGroupItem value={provider.id} className="flex-shrink-0" />
+          <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium truncate">{provider.name}</span>
+              {provider.id === 'default' && (
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Default</span>
+              )}
+              {provider.id === defaultProviderId && provider.id !== 'default' && (
+                <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground truncate">
+              {provider.baseURL || 'https://api.openai.com/v1 (default)'}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Model selection toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowModels(!showModels)}
+            className="text-muted-foreground hover:text-primary"
+            title={showModels ? 'Hide models' : 'Select models'}
+          >
+            {showModels ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </Button>
+          {provider.id !== 'default' && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => onRemove(provider.id)}
+              className="text-muted-foreground hover:text-red-500"
+              title="Remove provider"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      {showModels && (
+        <div className="ml-8 mt-2 border-l-2 border-muted pl-4 space-y-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              Models ({enabledModelIds.length}/{allModels.length} enabled)
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSelectAll}
+              className="text-xs"
+            >
+              {isAllSelected ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {allModels.map((model) => (
+              <label
+                key={model.id}
+                className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+              >
+                <Checkbox
+                  checked={enabledModelIds.includes(model.id)}
+                  onCheckedChange={() => handleToggleModel(model.id)}
+                />
+                <span className="font-medium truncate max-w-[200px]">{model.label}</span>
+                <span className="text-xs text-muted-foreground">{model.id}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ApiKeysModalProps {
   open: boolean;
@@ -237,43 +361,14 @@ export function ApiKeysModal({
             {/* Providers List */}
             <RadioGroup value={defaultProviderId} onValueChange={handleSetDefault} className="space-y-2">
               {providers.map((provider) => (
-                <div 
-                  key={provider.id} 
-                  className={`flex items-center justify-between p-3 border rounded ${
-                    provider.id === defaultProviderId ? 'border-primary bg-primary/5' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <RadioGroupItem value={provider.id} className="flex-shrink-0" />
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{provider.name}</span>
-                        {provider.id === 'default' && (
-                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Default</span>
-                        )}
-                        {provider.id === defaultProviderId && provider.id !== 'default' && (
-                          <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {provider.baseURL || 'https://api.openai.com/v1 (default)'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {provider.id !== 'default' && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleRemoveProvider(provider.id)}
-                        className="text-muted-foreground hover:text-red-500"
-                        title="Remove provider"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                <ProviderModelsSection
+                  key={provider.id}
+                  provider={provider}
+                  defaultProviderId={defaultProviderId}
+                  onSetDefault={handleSetDefault}
+                  onRemove={handleRemoveProvider}
+                  onUpdate={handleUpdateProvider}
+                />
               ))}
               
               {providers.length === 0 && (

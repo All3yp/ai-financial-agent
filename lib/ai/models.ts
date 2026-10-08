@@ -84,6 +84,17 @@ export const getAllModels = (providerId?: string): Model[] => {
   return allModels;
 };
 
+import { getProviderById } from '@/lib/db/api-keys';
+
 export const getModelsForProvider = (providerId: string): Model[] => {
-  return getAllModels(providerId);
+  const allModels = getAllModels(providerId);
+  const provider = getProviderById(providerId);
+  
+  // If provider has enabledModelIds configured, filter to only those models
+  if (provider?.enabledModelIds && provider.enabledModelIds.length > 0) {
+    return allModels.filter(model => provider.enabledModelIds!.includes(model.id));
+  }
+  
+  // Otherwise return all models for this provider
+  return allModels;
 };
