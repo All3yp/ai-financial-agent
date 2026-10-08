@@ -3,7 +3,7 @@
 import type { User } from 'next-auth';
 import { useRouter } from 'next/navigation';
 
-import { PlusIcon } from '@/components/icons';
+import { PlusIcon, BrainIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
 import { SidebarUserNav } from '@/components/sidebar-user-nav';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,18 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               </TooltipTrigger>
               <TooltipContent align="end">New Chat</TooltipContent>
             </Tooltip>
+          </div>
+          
+          {/* Navigation Links */}
+          <div className="mt-4 space-y-1">
+            <Link
+              href="/agents"
+              onClick={() => setOpenMobile(false)}
+              className="flex items-center gap-3 px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+            >
+              <BrainIcon className="w-5 h-5" />
+              <span>Agents</span>
+            </Link>
           </div>
         </SidebarMenu>
       </SidebarHeader>

@@ -1119,3 +1119,21 @@ export const FullscreenIcon = ({ size = 16 }: { size?: number }) => (
     ></path>
   </svg>
 );
+
+export const BrainIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
+  <svg
+    height={size}
+    width={size}
+    className={className}
+    strokeLinejoin="round"
+    viewBox="0 0 16 16"
+    style={{ color: 'currentcolor' }}
+  >
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M8 1C4.686 1 2 3.686 2 7c0 1.5 0.7 2.8 1.8 3.6V15h1.2V10.6c1.1-0.8 1.8-2.1 1.8-3.6C7 3.686 4.314 1 8 1zm0 1.5c1.4 0 2.5 1.1 2.5 2.5S9.4 7.5 8 7.5S5.5 6.4 5.5 5S6.6 2.5 8 2.5zm0 10.5c-1.4 0-2.5-1.1-2.5-2.5S6.6 8 8 8s2.5 1.1 2.5 2.5S9.4 13 8 13z"
+      fill="currentColor"
+    ></path>
+  </svg>
+);
