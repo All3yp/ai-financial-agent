@@ -5,14 +5,18 @@ export interface ValidationResult {
   error?: string;
 }
 
-export async function validateOpenAIKey(apiKey: string): Promise<ValidationResult> {
+export async function validateOpenAIKey(apiKey: string, baseURL?: string): Promise<ValidationResult> {
   /**
    * We can check if an OpenAI API key is valid by making a request to 
    * OpenAI's Models API. If the key is valid, we will receive a list of models.
    * If the key is invalid, we will receive an error.
    */
   try {
-    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+    const openai = new OpenAI({ 
+      apiKey, 
+      baseURL,
+      dangerouslyAllowBrowser: true 
+    });
     const list = await openai.models.list();
 
     if (list.data.length > 0) {

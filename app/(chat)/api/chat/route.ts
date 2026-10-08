@@ -45,12 +45,16 @@ export async function POST(request: Request) {
     modelId,
     financialDatasetsApiKey,
     modelApiKey,
+    modelBaseURL,
+    modelProviderName,
   }: {
     id: string;
     messages: Array<Message>;
     modelId: string;
     financialDatasetsApiKey?: string;
     modelApiKey?: string;
+    modelBaseURL?: string;
+    modelProviderName?: string;
   } = await request.json();
 
   const session = await auth();
@@ -79,7 +83,12 @@ export async function POST(request: Request) {
   const chat = await getChatById({ id });
 
   if (!chat) {
-    const title = await generateTitleFromUserMessage({ message: userMessage, modelApiKey });
+    const title = await generateTitleFromUserMessage({ 
+      message: userMessage, 
+      modelApiKey,
+      modelBaseURL,
+      modelProviderName,
+    });
     await saveChat({ id, userId: session.user.id, title });
   }
 
@@ -112,7 +121,7 @@ export async function POST(request: Request) {
       });
 
       const { object } = await generateObject({
-        model: customModel('gpt-4.1-nano-2025-04-14', modelApiKey),
+        model: customModel('gpt-4.1-nano-2025-04-14', { apiKey: modelApiKey, baseURL: modelBaseURL, name: modelProviderName }),
         output: 'array',
         schema: z.object({
           task_name: z.string(),
@@ -174,7 +183,7 @@ export async function POST(request: Request) {
       }
 
       const result = streamText({
-        model: customModel(model.apiIdentifier, modelApiKey),
+        model: customModel(model.apiIdentifier, { apiKey: modelApiKey, baseURL: modelBaseURL, name: modelProviderName }),
         tools: financialToolsManager.getTools(),
         system: systemPrompt,
         messages: coreMessagesWithTaskNames,

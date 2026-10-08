@@ -65,6 +65,13 @@ Set the API keys in the .env file:
 # Get your OpenAI API key from https://platform.openai.com/
 OPENAI_API_KEY=your-openai-api-key
 
+# Optional: Base URL for OpenAI-compatible providers (e.g., Together.ai, Groq, etc.)
+# Leave empty for default OpenAI API
+OPENAI_BASE_URL=
+
+# Optional: Custom provider name for identification
+OPENAI_PROVIDER_NAME=
+
 # Get your Financial Datasets API key from https://financialdatasets.ai/
 FINANCIAL_DATASETS_API_KEY=your-financial-datasets-api-key
 

@@ -8,7 +8,7 @@ import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher, track } from '@/lib/utils';
-import { getFinancialDatasetsApiKey, getLocalOpenAIApiKey } from '@/lib/db/api-keys';
+import { getFinancialDatasetsApiKey, getLocalOpenAIApiKey, getLocalOpenAIBaseURL, getLocalOpenAIProviderName } from '@/lib/db/api-keys';
 
 import { Block } from './block';
 import { MultimodalInput } from './multimodal-input';
@@ -33,6 +33,8 @@ export function Chat({
   const { mutate } = useSWRConfig();
   const financialDatasetsApiKey = getFinancialDatasetsApiKey();
   const openAIApiKey = getLocalOpenAIApiKey();
+  const openAIBaseURL = getLocalOpenAIBaseURL();
+  const openAIProviderName = getLocalOpenAIProviderName();
   const [showApiKeysModal, setShowApiKeysModal] = useState(false);
 
   const {
@@ -51,6 +53,8 @@ export function Chat({
       id, 
       modelId: selectedModelId,
       modelApiKey: openAIApiKey,
+      modelBaseURL: openAIBaseURL,
+      modelProviderName: openAIProviderName,
       financialDatasetsApiKey,
     },
     initialMessages,

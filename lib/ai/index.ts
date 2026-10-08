@@ -3,8 +3,19 @@ import { experimental_wrapLanguageModel as wrapLanguageModel } from 'ai';
 
 import { customMiddleware } from './custom-middleware';
 
-export const customModel = (apiIdentifier: string, openAIApiKey: string) => {
-  const provider = createOpenAI({ apiKey: openAIApiKey, compatibility: 'strict' });
+export interface ModelProviderConfig {
+  apiKey: string;
+  baseURL?: string;
+  name?: string;
+}
+
+export const customModel = (apiIdentifier: string, config: ModelProviderConfig) => {
+  const provider = createOpenAI({ 
+    apiKey: config.apiKey, 
+    baseURL: config.baseURL,
+    name: config.name,
+    compatibility: 'strict' 
+  });
   return wrapLanguageModel({
     model: provider.chat(apiIdentifier),
     middleware: customMiddleware,
