@@ -207,9 +207,48 @@ Before implementing these items, resolve their concrete prerequisites:
 - Mode-specific yield and volatility figures below are design examples, not
   validated targets or guarantees.
 
+### Phase 0: Persistent And Reliable Autonomous Operation (Top Priority)
+
+These prerequisites come before promising unattended monitoring or remote
+notifications. The current PostgreSQL schema has no portfolio, schedule, run,
+report or notification entities; Inngest is wired, but some scheduled steps are
+placeholders and the trigger can execute the same request synchronously and as
+a background event.
+
+- [ ] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
+  validated CRUD, import/export, and tests for cross-user isolation.
+- [ ] Store holding snapshots and sourced price histories with currency,
+  adjustment basis, source, observed-at/as-of timestamps and staleness checks;
+  do not treat manually uploaded quantitative JSON as an automatically updated
+  portfolio.
+- [ ] Persist job runs, statuses, step results, errors, reports and screening
+  results; connect dashboard History/status to those records and define retention.
+- [ ] Choose one trigger contract: queued/background with run ID and status
+  polling, or synchronous only. Remove accidental double execution, and add
+  idempotency keys, bounded concurrency, per-user limits and failure visibility.
+- [ ] Make scheduled monitoring query only enabled, owner-authorized portfolios;
+  let users configure frequency, timezone and pause/resume, and account for
+  market sessions, daylight-saving changes, holidays, stale data and provider
+  quotas. Do not describe the current UTC weekday crons as exchange-hours aware.
+- [ ] Add an opt-in notification outbox with deduplication, bounded retries,
+  throttling, delivery status, quiet hours and revocation. Begin with concise
+  summaries/critical alerts that omit holdings and secrets by default.
+- [ ] After durable runs, ownership checks and opt-in controls exist, implement
+  Telegram as a private notification/control channel: short-lived single-use
+  account-link codes, unlink/revoke, server-only bot token, webhook secret
+  validation, bounded request parsing, update deduplication and authorization
+  for deterministic commands such as `/status`, `/ultimo_relatorio`, `/pausar`
+  and `/retomar`. Never let a chat command authorize trades or rebalance.
+- [ ] Harden account identity and authorization before exposing portfolio data
+  or controls remotely; audit ownership checks on every route and define secret
+  handling, data minimization, consent, retention and backup/restore procedures.
+- [ ] Add operational health checks and alerts for missed/failed/stale runs,
+  provider failures, exhausted quotas, notification failures and Inngest
+  configuration; document deployment, recovery and migration procedures.
+
 ### Phase 1: Core Data Expansion (High Priority)
 
-- [ ] **SEC Filings Parser**
+- [x] **SEC discovery, Company Facts and supported filing sections**
   - [x] `getSECFilings({ ticker, formType: '10-K'|'10-Q'|'8-K', limit? })` - metadata and official links
   - [x] Historical submissions pagination and amended-form support (bounded, with coverage metadata)
   - [x] Automatic `SEC_USER_AGENT` configuration in local setup without erasing existing settings
@@ -360,14 +399,18 @@ HTTP/CLI additionally enforce a 1 MiB input byte limit; HTTP requires a signed-i
 user. Prices must be real sourced, same-currency and consistently adjusted.
 Provenance, FX conversion and corporate-action adjustment are caller obligations.
 
-- [ ] `calculatePortfolioRisk(positions[])` - VaR, CVaR, factor exposure
-- [ ] `optimizePortfolio(constraints)` - Mean-variance, risk parity, HRP
-- [x] Local long-only minimum-variance, equal-risk-contribution and genuine HRP optimization (`optimizePortfolio` tool)
+- [x] Local `calculatePortfolioRisk` with historical VaR/CVaR and risk metrics;
+  factor exposure is reported separately by the factor-analysis tool
+- [x] Local long-only minimum-variance, equal-risk-contribution and genuine HRP
+  optimization (`optimizePortfolio` tool)
 - [ ] Expected-return mean-variance objectives, turnover/cost/liquidity constraints and historical validation
-- [ ] `stressTestPortfolio(scenarios)` - 2008, 2020, rate shock, inflation
-- [ ] `calculateCorrelationMatrix(tickers)` - Factor models (PCA)
+- [x] `stressTestPortfolio(scenarios)` with explicit caller-supplied shocks;
+  historical 2008/2020 replay and inferred macro shocks remain pending
+- [x] `calculateCorrelationMatrix(tickers)` for aligned Pearson correlations;
+  PCA is available separately and causal factor attribution remains pending
 - [x] Actual covariance PCA and optional explicit-factor regression (`analyzePortfolioFactors` tool)
-- [ ] `generatePortfolioReport(positions[])` - Attribution, risk decomposition
+- [x] Deterministic `generatePortfolioReport` for risk, correlation and explicit
+  stress results; realized attribution and fuller risk decomposition remain pending
 
 `lib/portfolio/optimize.ts` uses `ml-matrix` for sample covariance and matrix
 operations. It requires identical real price dates (21 to 501) for at most ten
@@ -411,7 +454,8 @@ the complete autonomous agent team, allocation optimizer or scheduling system.
 - [x] **TimeHorizonAgent** - configurable historical momentum horizons with differing evidence preserved
 - [ ] **ConservativeModeAgent** - FIIs, dividend aristocrats, bonds, low vol
 - [ ] **AggressiveModeAgent** - Momentum, growth, small caps, crypto
-- [ ] **TeamOrchestrator** - Coordinates specialists, resolves conflicts, produces consensus
+- [ ] **Traditional TeamOrchestrator** - Coordinates traditional specialists and
+  modes; distinct from the completed deterministic quantitative orchestrator
 - [x] **QuantitativeTeamOrchestrator** - validated parallel quantitative specialists and evidence-based synthesis
 
 `lib/agents/quantitative.ts` provides deterministic agents that use existing
@@ -428,12 +472,19 @@ modes, FIIs, live sourced-history acquisition and schedules remain pending.
 ### Phase 8: Execution Modes Beyond Chat
 
 - [x] Authenticated portfolio risk REST endpoint and local report CLI (see Phase 6)
-- [ ] **Scheduled Reports** - Daily/weekly/monthly via Inngest cron
-- [ ] **Webhook Alerts** - Push to Discord/Slack/Email/Telegram
-- [ ] **API Endpoints** - REST/GraphQL for external integration
+- [x] Inngest cron baseline for fixed weekday monitoring/screening (UTC)
+- [ ] User-configurable daily/weekly/monthly reports with persisted schedules,
+  timezone, exchange calendar, pause/resume and delivery history (Phase 0)
+- [ ] Opt-in notification connectors and delivery controls (Telegram requirements
+  are listed in Phase 0)
+- [x] Authenticated REST subset: portfolio risk and quantitative analysis
+- [ ] Complete documented REST coverage; GraphQL remains optional and is not
+  required unless an external integration needs it
 - [ ] **CLI Tool** - `pnpm agent:analyze AAPL --mode=conservative`
 - [x] Quantitative team CLI: `pnpm agent:analyze --input input.json --mode=quantitative`
-- [ ] **Background Workers** - Continuous monitoring, auto-rebalancing signals
+- [x] Inngest event consumers and fixed weekday cron entry points
+- [ ] Persistent, owner-scoped scheduled monitoring with run status and alerts
+  (Phase 0); auto-rebalancing signals require a separately validated strategy
 - [ ] **Dashboard Widgets** - Real-time regime, allocation, risk metrics
 - [x] Manual dated quantitative/risk widgets in `/agents` Quantitative tab (not real-time allocation or streaming)
 
@@ -447,6 +498,9 @@ modes, FIIs, live sourced-history acquisition and schedules remain pending.
 - [ ] **LangSmith/Helicone** - Tracing, evals, cost tracking
 - [ ] **Eval Framework** - Golden datasets, regression testing
 - [x] Repeatable local fixture regression, typecheck and application-build commands (`pnpm test`, `pnpm typecheck`, `pnpm build:app`)
+- [ ] Dedicated agent/model evaluation suite with versioned golden cases,
+  quality/safety criteria, provider compatibility checks and cost/latency tracking;
+  current fixture tests are deterministic regression tests, not model evaluations
 
 The quantitative CLI reads a bounded 1 MiB UTF-8 JSON file containing
 `{ market, portfolio? }`. It does not download prices or call a model and rejects
