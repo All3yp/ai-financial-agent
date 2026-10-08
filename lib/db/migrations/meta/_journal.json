@@ -36,6 +36,20 @@
       "when": 1733945232355,
       "tag": "0004_odd_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791469425224,
+      "tag": "0005_owner_scoped_portfolios",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791469651382,
+      "tag": "0006_owner_scoped_collection_names",
+      "breakpoints": true
     }
   ]
 }

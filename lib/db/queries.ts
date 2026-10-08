@@ -24,7 +24,7 @@ import type { BlockKind } from '@/components/block';
 
 // biome-ignore lint: Forbidden non-null assertion.
 const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+export const db = drizzle(client);
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
@@ -126,7 +126,9 @@ export async function getMessagesByChatId({ id }: { id: string }) {
   }
 }
 
-export async function getTotalUserMessagesByUserId({ userId }: { userId: string | undefined }) {
+export async function getTotalUserMessagesByUserId({
+  userId,
+}: { userId: string | undefined }) {
   if (!userId) {
     return 0;
   }
@@ -138,12 +140,7 @@ export async function getTotalUserMessagesByUserId({ userId }: { userId: string 
       })
       .from(message)
       .innerJoin(chat, eq(message.chatId, chat.id))
-      .where(
-        and(
-          eq(chat.userId, userId),
-          eq(message.role, 'user')
-        )
-      );
+      .where(and(eq(chat.userId, userId), eq(message.role, 'user')));
 
     return result?.count ?? 0;
   } catch (error) {

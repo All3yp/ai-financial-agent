@@ -210,13 +210,29 @@ Before implementing these items, resolve their concrete prerequisites:
 ### Phase 0: Persistent And Reliable Autonomous Operation (Top Priority)
 
 These prerequisites come before promising unattended monitoring or remote
-notifications. The current PostgreSQL schema has no portfolio, schedule, run,
-report or notification entities; Inngest is wired, but some scheduled steps are
-placeholders and the trigger can execute the same request synchronously and as
-a background event.
+notifications. Owner-scoped portfolio and watchlist tables now exist, but
+holding snapshots, schedules, runs, reports and notifications are not yet
+persisted; Inngest is wired, but some scheduled steps are placeholders and the
+trigger can execute the same request synchronously and as a background event.
 
-- [ ] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
+- [x] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
   validated CRUD, import/export, and tests for cross-user isolation.
+
+Portfolio and watchlist data use `Portfolio`, `PortfolioHolding`, `Watchlist`
+and `WatchlistTicker` tables, with cascading owner/parent foreign keys and
+per-owner collection-name uniqueness. Authenticated CRUD is available at
+`/api/portfolio`, `/api/portfolio/[id]`, `/api/watchlists` and
+`/api/watchlists/[id]`. `GET /api/portfolio` exports a versioned JSON bundle;
+`PUT /api/portfolio` imports it by merging collections by owner and name,
+replacing holdings/tickers only for collections present in the import. Omitted
+collections are left unchanged. Inputs are strict and bounded (1 MiB request,
+50 collections per type, 100 holdings per portfolio, 500 tickers per watchlist).
+Every record lookup and mutation is owner-filtered; foreign IDs return the same
+404 as missing IDs. Apply migrations with `pnpm db:migrate` against the intended
+`POSTGRES_URL` before using these routes. Cross-user, validation, size-limit and
+import/export behavior has fixture-backed coverage in
+`lib/portfolio/persistence-http.test.ts`.
+
 - [ ] Store holding snapshots and sourced price histories with currency,
   adjustment basis, source, observed-at/as-of timestamps and staleness checks;
   do not treat manually uploaded quantitative JSON as an automatically updated

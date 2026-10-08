@@ -9,6 +9,8 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  doublePrecision,
+  unique,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -113,3 +115,77 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const portfolio = pgTable(
+  'Portfolio',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull(),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    userNameUnique: unique().on(table.userId, table.name),
+  }),
+);
+
+export type Portfolio = InferSelectModel<typeof portfolio>;
+
+export const portfolioHolding = pgTable(
+  'PortfolioHolding',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    portfolioId: uuid('portfolioId')
+      .notNull()
+      .references(() => portfolio.id, { onDelete: 'cascade' }),
+    ticker: varchar('ticker', { length: 20 }).notNull(),
+    shares: doublePrecision('shares').notNull(),
+    costBasis: doublePrecision('costBasis'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    portfolioTickerUnique: unique().on(table.portfolioId, table.ticker),
+  }),
+);
+
+export type PortfolioHolding = InferSelectModel<typeof portfolioHolding>;
+
+export const watchlist = pgTable(
+  'Watchlist',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    userNameUnique: unique().on(table.userId, table.name),
+  }),
+);
+
+export type Watchlist = InferSelectModel<typeof watchlist>;
+
+export const watchlistTicker = pgTable(
+  'WatchlistTicker',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    watchlistId: uuid('watchlistId')
+      .notNull()
+      .references(() => watchlist.id, { onDelete: 'cascade' }),
+    ticker: varchar('ticker', { length: 20 }).notNull(),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    watchlistTickerUnique: unique().on(table.watchlistId, table.ticker),
+  }),
+);
+
+export type WatchlistTicker = InferSelectModel<typeof watchlistTicker>;

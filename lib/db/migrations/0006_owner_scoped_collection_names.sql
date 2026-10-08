@@ -1,0 +1,2 @@
+ALTER TABLE "Portfolio" ADD CONSTRAINT "Portfolio_userId_name_unique" UNIQUE("userId","name");--> statement-breakpoint
+ALTER TABLE "Watchlist" ADD CONSTRAINT "Watchlist_userId_name_unique" UNIQUE("userId","name");
