@@ -4,10 +4,19 @@
 import { inngest } from './client';
 import { agentMemory } from './base';
 import { initializeAgents } from './specialized';
+import { agentRunStore } from '@/lib/db/agent-runs';
+import { sanitizeRunError } from './run-store';
 
 // Initialize agents with API key from environment
 const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY || '';
 const agents = initializeAgents(FINANCIAL_DATASETS_API_KEY);
+
+export const cleanupExpiredAgentRuns = inngest.createFunction(
+  { id: 'cleanup-expired-agent-runs', name: 'Clean Up Expired Agent Runs' },
+  { cron: '0 3 * * *' },
+  async ({ step }) =>
+    step.run('delete-expired-runs', () => agentRunStore.deleteExpiredRuns()),
+);
 
 // ============================================
 // SCHEDULED MONITORING - Runs every hour during market hours
@@ -146,18 +155,39 @@ export const runScreeningWorkflow = inngest.createFunction(
   { id: 'run-screening-workflow', name: 'Run Stock Screening' },
   { event: 'agent/screening.requested' },
   async ({ event, step }) => {
-    const { criteria } = event.data;
-    const result = await step.run('screen', () =>
-      agents.screener.execute({
-        id: `screen-${Date.now()}`,
-        agentId: 'screener-agent',
-        type: 'screen',
-        input: { criteria, limit: 50 },
-        status: 'pending',
-        createdAt: new Date(),
-      }),
-    );
-    return { result };
+    const { criteria, runId } = event.data;
+    if (typeof runId !== 'string')
+      throw new Error('Screening run ID is missing');
+    try {
+      await step.run('persist-run-start', () =>
+        agentRunStore.markRunRunning(runId),
+      );
+      await step.run('persist-screen-start', () =>
+        agentRunStore.markStepRunning(runId, 'screen'),
+      );
+      const result = await step.run('screen', () =>
+        agents.screener.execute({
+          id: runId,
+          agentId: 'screener-agent',
+          type: 'screen',
+          input: { criteria, limit: 50 },
+          status: 'pending',
+          createdAt: new Date(),
+        }),
+      );
+      await step.run('persist-screen-result', () =>
+        agentRunStore.completeStep(runId, 'screen', result),
+      );
+      await step.run('persist-run-result', () =>
+        agentRunStore.completeRun(runId, result),
+      );
+      return { runId, result };
+    } catch (error) {
+      await step.run('persist-run-failure', () =>
+        agentRunStore.failRun(runId, sanitizeRunError(error)),
+      );
+      throw error;
+    }
   },
 );
 

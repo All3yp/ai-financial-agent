@@ -211,9 +211,10 @@ Before implementing these items, resolve their concrete prerequisites:
 
 These prerequisites come before promising unattended monitoring or remote
 notifications. Owner-scoped portfolio and watchlist tables now exist, but
-holding snapshots and caller-submitted price histories are persisted. Schedules,
-runs, reports and notifications are not yet persisted; Inngest is wired, but
-some scheduled steps are placeholders and the trigger can execute the same
+holding snapshots and caller-submitted price histories are persisted. On-demand
+screening runs now have durable records; other workflow runs, schedules, reports
+and notifications are not yet persisted. Inngest is wired, but some scheduled
+steps are placeholders and other trigger paths can still execute the same
 request synchronously and as a background event.
 
 - [x] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
@@ -252,8 +253,25 @@ The current shared price client does not establish currency or adjustment
 basis, so these endpoints do not automatically fetch prices or connect captured
 data to the risk/quantitative tools. Manual quantitative JSON uploads remain
 separate and never create or refresh these records.
-- [ ] Persist job runs, statuses, step results, errors, reports and screening
+
+- [ ] Persist all job runs, statuses, step results, errors, reports and screening
   results; connect dashboard History/status to those records and define retention.
+
+The first durable-run slice currently covers on-demand screening only. It
+creates an owner-scoped `AgentRun` before enqueueing, passes that run ID through
+the Inngest event, persists `pending`/`running`/`completed`/`failed` status and
+the `screen` step output, and exposes authenticated owner-filtered history and
+detail at `/api/agents/runs` and `/api/agents/runs/[id]`. The `/agents` History
+tab reads these records and polls status while open. Screening submission is
+queued-only and returns HTTP 202; it no longer also performs the same work
+synchronously. A daily 03:00 UTC Inngest job deletes records after their
+90-day retention window, cascading to step results. Other workflow types still
+use their existing behavior and do not yet have durable runs; screening criteria
+are retained as input, but separate report and screening-result entities,
+concurrency limits, idempotency controls and full trigger-contract cleanup
+remain open. Deployments must register the Inngest functions and apply database
+migrations for this lifecycle to run.
+
 - [ ] Choose one trigger contract: queued/background with run ID and status
   polling, or synchronous only. Remove accidental double execution, and add
   idempotency keys, bounded concurrency, per-user limits and failure visibility.

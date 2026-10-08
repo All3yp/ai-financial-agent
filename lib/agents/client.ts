@@ -28,16 +28,28 @@ export const AgentEvents = {
 } as const;
 
 // Type-safe event sending
-export async function requestAnalysis(ticker: string, peers?: string[], userId?: string) {
+export async function requestAnalysis(
+  ticker: string,
+  peers?: string[],
+  userId?: string,
+) {
   await sendEvent(AgentEvents.ANALYSIS_REQUESTED, { ticker, peers, userId });
 }
 
-export async function requestDebate(ticker: string, question: string, userId?: string) {
+export async function requestDebate(
+  ticker: string,
+  question: string,
+  userId?: string,
+) {
   await sendEvent(AgentEvents.DEBATE_REQUESTED, { ticker, question, userId });
 }
 
-export async function requestScreening(criteria: any, userId?: string) {
-  await sendEvent(AgentEvents.SCREENING_REQUESTED, { criteria, userId });
+export async function requestScreening(
+  criteria: any,
+  userId?: string,
+  runId?: string,
+) {
+  await sendEvent(AgentEvents.SCREENING_REQUESTED, { criteria, userId, runId });
 }
 
 export async function requestMonitoring(positions: any[], userId?: string) {

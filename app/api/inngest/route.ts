@@ -10,6 +10,7 @@ import {
   runMonitoringWorkflow,
   runReportWorkflow,
   runScreeningWorkflow,
+  cleanupExpiredAgentRuns,
 } from '@/lib/agents/inngest';
 import { serve } from 'inngest/next';
 
@@ -24,5 +25,6 @@ export const { GET, POST, PUT } = serve({
     runScreeningWorkflow,
     runMonitoringWorkflow,
     runReportWorkflow,
+    cleanupExpiredAgentRuns,
   ],
 });

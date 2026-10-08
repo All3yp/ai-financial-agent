@@ -289,3 +289,60 @@ export const portfolioPricePoint = pgTable(
 );
 
 export type PortfolioPricePoint = InferSelectModel<typeof portfolioPricePoint>;
+
+export const agentRun = pgTable(
+  'AgentRun',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    userId: uuid('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    workflowType: varchar('workflowType', {
+      enum: ['analysis', 'debate', 'screening', 'monitoring'],
+    }).notNull(),
+    status: varchar('status', {
+      enum: ['pending', 'running', 'completed', 'failed'],
+    })
+      .notNull()
+      .default('pending'),
+    input: json('input').notNull(),
+    result: json('result'),
+    error: text('error'),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    startedAt: timestamp('startedAt', { withTimezone: true }),
+    completedAt: timestamp('completedAt', { withTimezone: true }),
+    expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    ownerCreatedIdx: index().on(table.userId, table.createdAt, table.id),
+    expiryIdx: index().on(table.expiresAt),
+  }),
+);
+
+export type AgentRun = InferSelectModel<typeof agentRun>;
+
+export const agentRunStep = pgTable(
+  'AgentRunStep',
+  {
+    runId: uuid('runId')
+      .notNull()
+      .references(() => agentRun.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    status: varchar('status', {
+      enum: ['pending', 'running', 'completed', 'failed'],
+    })
+      .notNull()
+      .default('pending'),
+    result: json('result'),
+    error: text('error'),
+    startedAt: timestamp('startedAt', { withTimezone: true }),
+    completedAt: timestamp('completedAt', { withTimezone: true }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.runId, table.name] }),
+  }),
+);
+
+export type AgentRunStep = InferSelectModel<typeof agentRunStep>;

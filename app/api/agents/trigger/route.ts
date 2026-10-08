@@ -10,6 +10,8 @@ import {
   requestScreening,
   requestMonitoring,
 } from '@/lib/agents/client';
+import { agentRunStore } from '@/lib/db/agent-runs';
+import { submitScreeningRun } from '@/lib/agents/run-http';
 
 const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY || '';
 const agents = initializeAgents(FINANCIAL_DATASETS_API_KEY);
@@ -216,19 +218,13 @@ Provide:
             { status: 400 },
           );
         }
-
-        await requestScreening(criteria, session.user.id);
-
-        const result = await agents.screener.execute({
-          id: `screen-${Date.now()}`,
-          agentId: 'screener-agent',
-          type: 'screen',
-          input: { criteria, limit: 50 },
-          status: 'pending',
-          createdAt: new Date(),
-        });
-
-        return NextResponse.json({ success: true, data: result });
+        return await submitScreeningRun(
+          session.user.id,
+          { criteria },
+          agentRunStore,
+          (submittedCriteria, userId, runId) =>
+            requestScreening(submittedCriteria, userId, runId),
+        );
       }
 
       case 'monitoring': {
