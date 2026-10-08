@@ -117,6 +117,11 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 
 ### Provider Selection
 
+See [Data Provider Guide](docs/PROVEDORES_DE_DADOS.md) for current adapters and
+proposed EODHD, yfinance, Nasdaq Data Link, CoinGecko and GDELT integrations.
+These candidates are not selectable providers yet. Parquet/DuckDB and a custom
+MCP server are architectural options, not implemented infrastructure.
+
 Financial Datasets remains supported and is the default when its API key is
 configured. FMP, Alpha Vantage and Twelve Data are optional alternatives through
 the shared `FinancialDataClient`, used by chat and agent financial tools.
