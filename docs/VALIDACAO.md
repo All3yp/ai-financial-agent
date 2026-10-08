@@ -35,8 +35,11 @@ local, que executou os cálculos sem modelo ou fonte externa.
 - Layouts 1440 x 1000 e 390 x 844 inspecionados por screenshots e medidas DOM,
   sem overflow horizontal da página ou sobreposição observada.
 - Botão de exportação gera link `blob:` com nome
-  `quantitative-2026-09-21.json`. O navegador integrado não emitiu o evento de
-  download; a gravação do arquivo no disco não foi confirmada por esse teste.
+  `quantitative-2026-09-21.json`. O arquivo baixado foi posteriormente encontrado
+  no workspace e seu JSON é exatamente igual à saída atual da CLI para a fixture
+  versionada. Ele contém somente resultados sintéticos de `TEST_*`, é ignorado
+  pelo Git e não substitui a entrada reproduzível
+  `docs/exemplos/quantitative-fixture.json`.
 
 Não foram enviados dados financeiros reais ou segredos aos provedores. O acesso
 à aplicação pode criar a identidade automática e sessão no banco local; não
