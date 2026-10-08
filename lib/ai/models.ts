@@ -2,7 +2,7 @@
 // Built-in models are defined in model-catalog.ts for better organization
 // Custom models are stored in localStorage and managed via the UI
 
-import { Model } from './model-catalog';
+import type { Model } from './model-catalog';
 import {
   getAllBuiltInModels,
   getModelsForProvider as getCatalogModelsForProvider,
@@ -76,7 +76,7 @@ export const getModelsForProvider = (providerId: string): Model[] => {
   
   // If provider has enabledModelIds configured, filter to only those models
   if (provider?.enabledModelIds && provider.enabledModelIds.length > 0) {
-    return allModels.filter(model => provider.enabledModelIds!.includes(model.id));
+    return allModels.filter(model => provider.enabledModelIds?.includes(model.id));
   }
   
   // Otherwise return all models for this provider

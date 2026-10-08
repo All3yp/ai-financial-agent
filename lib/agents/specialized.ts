@@ -1,10 +1,91 @@
 // Specialized Financial Agents
 // Each agent has a specific role and expertise
 
-import { BaseAgent, AgentTask, createAgentConfig, registerAgent } from './base';
-import { FinancialToolsManager } from '../ai/tools/financial-tools';
+import {
+  BaseAgent,
+  type AgentTask,
+  createAgentConfig,
+  registerAgent,
+} from './base';
 import { getAllModels } from '../ai/models';
 import { customModel } from '../ai';
+import { validStockSearchFilters } from '../api/stock-filters';
+
+type ScreeningFilter = {
+  field: string;
+  operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+  value: number;
+};
+
+const screeningFieldAliases: Record<string, string> = {
+  debtToEquity: 'debt_to_equity',
+  peRatio: 'price_to_earnings_ratio',
+  payoutRatio: 'payout_ratio',
+  pegRatio: 'peg_ratio',
+  revenueGrowth: 'revenue_growth',
+  roe: 'return_on_equity',
+};
+
+export function normalizeScreeningCriteria(
+  criteria: unknown,
+): ScreeningFilter[] {
+  if (Array.isArray(criteria)) {
+    return criteria.map((filter) => {
+      if (
+        !filter ||
+        typeof filter !== 'object' ||
+        typeof filter.field !== 'string' ||
+        !['gt', 'gte', 'lt', 'lte', 'eq'].includes(filter.operator) ||
+        typeof filter.value !== 'number'
+      ) {
+        throw new Error(
+          'Each screening filter must contain field, operator, and numeric value',
+        );
+      }
+      const field = screeningFieldAliases[filter.field] ?? filter.field;
+      if (!validStockSearchFilters.includes(field)) {
+        throw new Error(`Unsupported screening field: ${filter.field}`);
+      }
+      return {
+        field,
+        operator: filter.operator,
+        value: filter.value,
+      } as ScreeningFilter;
+    });
+  }
+
+  if (!criteria || typeof criteria !== 'object') {
+    throw new Error(
+      'Screening criteria must be an object or an array of filters',
+    );
+  }
+
+  const filters: ScreeningFilter[] = [];
+  for (const [inputField, constraint] of Object.entries(criteria)) {
+    const field = screeningFieldAliases[inputField] ?? inputField;
+    if (!validStockSearchFilters.includes(field)) {
+      throw new Error(`Unsupported screening field: ${inputField}`);
+    }
+    if (typeof constraint === 'number') {
+      filters.push({ field, operator: 'gte', value: constraint });
+      continue;
+    }
+    if (!constraint || typeof constraint !== 'object') {
+      throw new Error(`Invalid constraint for screening field: ${inputField}`);
+    }
+    const range = constraint as Record<string, unknown>;
+    if (typeof range.min === 'number')
+      filters.push({ field, operator: 'gte', value: range.min });
+    if (typeof range.max === 'number')
+      filters.push({ field, operator: 'lte', value: range.max });
+    if (typeof range.eq === 'number')
+      filters.push({ field, operator: 'eq', value: range.eq });
+  }
+
+  if (filters.length === 0)
+    throw new Error('At least one screening filter is required');
+  return filters;
+}
 
 // ============================================
 // RESEARCH AGENT - Gathers raw financial data
@@ -12,12 +93,13 @@ import { customModel } from '../ai';
 
 export class ResearchAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
-    super(createAgentConfig(
-      'research-agent',
-      'Research Agent',
-      'Gathers raw financial data from multiple sources',
-      'apodex/apodex-1.1-mini:free', // Best for research: reasoning-first, 262K context, evidence-grounded
-      `You are a Financial Research Agent. Your job is to gather accurate, comprehensive financial data.
+    super(
+      createAgentConfig(
+        'research-agent',
+        'Research Agent',
+        'Gathers raw financial data from multiple sources',
+        'apodex/apodex-1.1-mini:free', // Best for research: reasoning-first, 262K context, evidence-grounded
+        `You are a Financial Research Agent. Your job is to gather accurate, comprehensive financial data.
 
 AVAILABLE TOOLS:
 - getStockPrices: Historical price data
@@ -48,16 +130,30 @@ OUTPUT FORMAT:
   "dataQuality": "complete|partial|limited",
   "notes": "..."
 }`,
-      ['getStockPrices', 'getIncomeStatements', 'getBalanceSheets', 'getCashFlowStatements', 'getFinancialMetrics', 'searchStocksByFilters'],
-      15
-    ), financialDatasetsApiKey);
+        [
+          'getStockPrices',
+          'getIncomeStatements',
+          'getBalanceSheets',
+          'getCashFlowStatements',
+          'getFinancialMetrics',
+          'searchStocksByFilters',
+        ],
+        15,
+      ),
+      financialDatasetsApiKey,
+    );
   }
 
   async execute(task: AgentTask): Promise<any> {
-    const { ticker, period = 'quarterly', limit = 20, includeMetrics = true } = task.input;
-    
+    const {
+      ticker,
+      period = 'quarterly',
+      limit = 20,
+      includeMetrics = true,
+    } = task.input;
+
     this.updateTaskStatus(task.id, 'running');
-    
+
     try {
       const tools = this.toolsManager.getTools();
       const results: any = { ticker };
@@ -75,8 +171,8 @@ OUTPUT FORMAT:
 
       // Parallel data fetching
       const [prices, income, balance, cashflow, metrics] = await Promise.all([
-        tools.getStockPrices.execute({ 
-          ticker, 
+        tools.getStockPrices.execute({
+          ticker,
           start_date: startDate.toISOString().split('T')[0],
           end_date: endDate.toISOString().split('T')[0],
           interval: 'day',
@@ -85,14 +181,16 @@ OUTPUT FORMAT:
         tools.getIncomeStatements.execute({ ticker, period, limit }),
         tools.getBalanceSheets.execute({ ticker, period, limit }),
         tools.getCashFlowStatements.execute({ ticker, period, limit }),
-        includeMetrics ? tools.getFinancialMetrics.execute({ ticker, period, limit }) : Promise.resolve({ data: [] }),
+        includeMetrics
+          ? tools.getFinancialMetrics.execute({ ticker, period, limit })
+          : Promise.resolve({ financial_metrics: [] }),
       ]);
 
-      results.prices = prices?.historical || [];
-      results.incomeStatements = income.data;
-      results.balanceSheets = balance.data;
-      results.cashFlows = cashflow.data;
-      results.metrics = metrics.data;
+      results.prices = prices?.historical?.prices ?? [];
+      results.incomeStatements = income?.income_statements ?? [];
+      results.balanceSheets = balance?.balance_sheets ?? [];
+      results.cashFlows = cashflow?.cash_flow_statements ?? [];
+      results.metrics = metrics?.financial_metrics ?? [];
 
       // Assess data quality
       const dataPoints = [
@@ -103,13 +201,23 @@ OUTPUT FORMAT:
         results.metrics?.length || 0,
       ];
       const totalPoints = dataPoints.reduce((a, b) => a + b, 0);
-      results.dataQuality = totalPoints > 50 ? 'complete' : totalPoints > 20 ? 'partial' : 'limited';
+      results.dataQuality =
+        totalPoints > 50
+          ? 'complete'
+          : totalPoints > 20
+            ? 'partial'
+            : 'limited';
       results.periodsCovered = `${period}, ${limit} periods`;
 
       this.updateTaskStatus(task.id, 'completed', results);
       return results;
     } catch (error) {
-      this.updateTaskStatus(task.id, 'failed', null, error instanceof Error ? error.message : 'Unknown error');
+      this.updateTaskStatus(
+        task.id,
+        'failed',
+        null,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       throw error;
     }
   }
@@ -121,12 +229,13 @@ OUTPUT FORMAT:
 
 export class AnalysisAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
-    super(createAgentConfig(
-      'analysis-agent',
-      'Analysis Agent',
-      'Performs deep financial analysis and valuation',
-      'thinkingmachines/inkling:free', // Best for analysis: multimodal MoE, 1M context, strong reasoning
-      `You are a Financial Analysis Agent. You receive raw financial data and produce expert analysis.
+    super(
+      createAgentConfig(
+        'analysis-agent',
+        'Analysis Agent',
+        'Performs deep financial analysis and valuation',
+        'thinkingmachines/inkling:free', // Best for analysis: multimodal MoE, 1M context, strong reasoning
+        `You are a Financial Analysis Agent. You receive raw financial data and produce expert analysis.
 
 ANALYSIS FRAMEWORKS:
 1. PROFITABILITY: Gross/Operating/Net margins trends, ROE, ROA, ROIC
@@ -163,31 +272,42 @@ OUTPUT FORMAT:
   "recommendation": "BUY|HOLD|SELL",
   "confidence": 0.85
 }`,
-      ['getFinancialMetrics'], // Can fetch additional metrics if needed
-      10
-    ), financialDatasetsApiKey);
+        ['getFinancialMetrics'], // Can fetch additional metrics if needed
+        10,
+      ),
+      financialDatasetsApiKey,
+    );
   }
 
   async execute(task: AgentTask): Promise<any> {
     const { researchData, peers = [] } = task.input;
-    
+
     this.updateTaskStatus(task.id, 'running');
-    
+
     try {
       // If peers provided, fetch their data for comparison
       let peerData: any = {};
       if (peers.length > 0) {
         const tools = this.toolsManager.getTools();
         const peerResults = await Promise.all(
-          peers.map((p: string) => tools.getFinancialMetrics.execute({ ticker: p, period: 'annual', limit: 5 }))
+          peers.map((p: string) =>
+            tools.getFinancialMetrics.execute({
+              ticker: p,
+              period: 'annual',
+              limit: 5,
+            }),
+          ),
         );
-        peerData = Object.fromEntries(peers.map((p: string, i: number) => [p, peerResults[i].data]));
+        peerData = Object.fromEntries(
+          peers.map((p: string, i: number) => [p, peerResults[i].data]),
+        );
       }
 
       // Use LLM for analysis
       const { streamText } = await import('ai');
-      const model = getAllModels().find(m => m.id === this.config.modelId);
-      const modelInstance = customModel(model!.apiIdentifier, {
+      const model = getAllModels().find((m) => m.id === this.config.modelId);
+      if (!model) throw new Error(`Model ${this.config.modelId} not found`);
+      const modelInstance = customModel(model.apiIdentifier, {
         apiKey: process.env.OPENAI_API_KEY || '',
         baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
         name: process.env.OPENAI_PROVIDER_NAME || 'openai',
@@ -216,12 +336,19 @@ Provide comprehensive analysis in the specified JSON format.`;
 
       // Parse JSON from response
       const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-      const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: 'Failed to parse analysis', raw: fullText };
+      const analysis = jsonMatch
+        ? JSON.parse(jsonMatch[0])
+        : { error: 'Failed to parse analysis', raw: fullText };
 
       this.updateTaskStatus(task.id, 'completed', analysis);
       return analysis;
     } catch (error) {
-      this.updateTaskStatus(task.id, 'failed', null, error instanceof Error ? error.message : 'Unknown error');
+      this.updateTaskStatus(
+        task.id,
+        'failed',
+        null,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       throw error;
     }
   }
@@ -233,12 +360,13 @@ Provide comprehensive analysis in the specified JSON format.`;
 
 export class ScreenerAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
-    super(createAgentConfig(
-      'screener-agent',
-      'Screener Agent',
-      'Screens stocks based on criteria and finds opportunities',
-      'nvidia/nemotron-3.5-lightning:free', // Best for screening: high-throughput agentic, 1M context
-      `You are a Stock Screener Agent. You find stocks matching specific criteria.
+    super(
+      createAgentConfig(
+        'screener-agent',
+        'Screener Agent',
+        'Screens stocks based on criteria and finds opportunities',
+        'nvidia/nemotron-3.5-lightning:free', // Best for screening: high-throughput agentic, 1M context
+        `You are a Stock Screener Agent. You find stocks matching specific criteria.
 
 SCREENING CAPABILITIES:
 - searchStocksByFilters: Filter by market cap, P/E, ROE, growth, margins, etc.
@@ -263,58 +391,80 @@ OUTPUT FORMAT:
   "totalScreened": 5000,
   "passed": 12
 }`,
-      ['searchStocksByFilters', 'getFinancialMetrics'],
-      10
-    ), financialDatasetsApiKey);
+        ['searchStocksByFilters', 'getFinancialMetrics'],
+        10,
+      ),
+      financialDatasetsApiKey,
+    );
   }
 
   async execute(task: AgentTask): Promise<any> {
     const { criteria, limit = 20 } = task.input;
-    
+
     this.updateTaskStatus(task.id, 'running');
-    
+
     try {
       const tools = this.toolsManager.getTools();
-      const results = await tools.searchStocksByFilters.execute({ 
-        filters: criteria, 
-        limit 
+      const filters = normalizeScreeningCriteria(criteria);
+      const results = await tools.searchStocksByFilters.execute({
+        filters,
+        limit,
       });
 
+      const stocks = results?.search_results ?? [];
+
       // Enhance with key metrics for top results
-      const topTickers = results.data.slice(0, 10).map((r: any) => r.ticker);
+      const topTickers = stocks.slice(0, 10).map((r: any) => r.ticker);
       const metrics = await Promise.all(
-        topTickers.map((t: string) => tools.getFinancialMetrics.execute({ ticker: t, period: 'annual', limit: 3 }))
+        topTickers.map((t: string) =>
+          tools.getFinancialMetrics.execute({
+            ticker: t,
+            period: 'annual',
+            limit: 3,
+          }),
+        ),
       );
 
-      const enhancedResults = results.data.map((r: any, i: number) => ({
-        ...r,
-        keyMetrics: metrics[i]?.data?.[0] || {},
-        score: this.calculateScore(r, metrics[i]?.data?.[0]),
-      })).sort((a: any, b: any) => b.score - a.score);
+      const enhancedResults = stocks
+        .map((r: any, i: number) => ({
+          ...r,
+          keyMetrics: metrics[i]?.financial_metrics?.[0] || {},
+          score: this.calculateScore(r, metrics[i]?.financial_metrics?.[0]),
+        }))
+        .sort((a: any, b: any) => b.score - a.score);
 
       const output = {
         screenName: criteria.name || 'Custom Screen',
         criteria,
         results: enhancedResults,
-        totalScreened: results.data.length,
+        totalScreened: stocks.length,
         passed: enhancedResults.length,
       };
 
       this.updateTaskStatus(task.id, 'completed', output);
       return output;
     } catch (error) {
-      this.updateTaskStatus(task.id, 'failed', null, error instanceof Error ? error.message : 'Unknown error');
+      this.updateTaskStatus(
+        task.id,
+        'failed',
+        null,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       throw error;
     }
   }
 
   private calculateScore(stock: any, metrics: any): number {
     let score = 50;
-    if (metrics?.roe > 15) score += 15;
-    if (metrics?.peRatio && metrics.peRatio < 20) score += 10;
-    if (metrics?.debtToEquity < 0.5) score += 10;
-    if (metrics?.fcfMargin > 15) score += 10;
-    if (metrics?.revenueGrowth > 10) score += 5;
+    if (metrics?.return_on_equity > 15) score += 15;
+    if (
+      metrics?.price_to_earnings_ratio &&
+      metrics.price_to_earnings_ratio < 20
+    )
+      score += 10;
+    if (metrics?.debt_to_equity < 0.5) score += 10;
+    if (metrics?.operating_margin > 15) score += 10;
+    if (metrics?.revenue_growth > 10) score += 5;
     return Math.min(100, Math.max(0, score));
   }
 }
@@ -325,12 +475,13 @@ OUTPUT FORMAT:
 
 export class MonitorAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
-    super(createAgentConfig(
-      'monitor-agent',
-      'Monitor Agent',
-      'Monitors positions and alerts on significant changes',
-      'meta-llama/llama-3.1-8b-instruct:free', // Fast general model for frequent checks (non-expiring)
-      `You are a Portfolio Monitor Agent. You check positions for significant changes.
+    super(
+      createAgentConfig(
+        'monitor-agent',
+        'Monitor Agent',
+        'Monitors positions and alerts on significant changes',
+        'meta-llama/llama-3.1-8b-instruct:free', // Fast general model for frequent checks (non-expiring)
+        `You are a Portfolio Monitor Agent. You check positions for significant changes.
 
 MONITORING CHECKS:
 1. Price movements (>5% daily, >20% from cost basis)
@@ -356,30 +507,32 @@ OUTPUT FORMAT:
   "summary": "3 alerts generated, 1 critical",
   "checkedAt": "2024-01-15T10:00:00Z"
 }`,
-      ['getStockPrices', 'getFinancialMetrics', 'getIncomeStatements'],
-      5
-    ), financialDatasetsApiKey);
+        ['getStockPrices', 'getFinancialMetrics', 'getIncomeStatements'],
+        5,
+      ),
+      financialDatasetsApiKey,
+    );
   }
 
   async execute(task: AgentTask): Promise<any> {
     const { positions, thresholds = {} } = task.input;
     // positions = [{ ticker, costBasis, shares, targetAllocation }]
-    
+
     this.updateTaskStatus(task.id, 'running');
-    
+
     try {
       const tools = this.toolsManager.getTools();
       const alerts: any[] = [];
 
       for (const position of positions) {
         const { ticker, costBasis, shares } = position;
-        
+
         // Get latest price
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 5);
-        const priceData = await tools.getStockPrices.execute({ 
-          ticker, 
+        const priceData = await tools.getStockPrices.execute({
+          ticker,
           start_date: startDate.toISOString().split('T')[0],
           end_date: endDate.toISOString().split('T')[0],
           interval: 'day',
@@ -387,11 +540,11 @@ OUTPUT FORMAT:
         });
         const latestPrice = priceData?.historical?.[0]?.close;
         const prevPrice = priceData?.historical?.[1]?.close;
-        
+
         if (latestPrice && prevPrice) {
-          const dailyChange = (latestPrice - prevPrice) / prevPrice * 100;
-          const totalReturn = (latestPrice - costBasis) / costBasis * 100;
-          
+          const dailyChange = ((latestPrice - prevPrice) / prevPrice) * 100;
+          const totalReturn = ((latestPrice - costBasis) / costBasis) * 100;
+
           if (Math.abs(dailyChange) > (thresholds.dailyMove || 5)) {
             alerts.push({
               ticker,
@@ -402,7 +555,7 @@ OUTPUT FORMAT:
               action: dailyChange < -10 ? 'review' : 'hold',
             });
           }
-          
+
           if (totalReturn < (thresholds.maxDrawdown || -20)) {
             alerts.push({
               ticker,
@@ -416,26 +569,30 @@ OUTPUT FORMAT:
         }
 
         // Check financial health
-        const metrics = await tools.getFinancialMetrics.execute({ ticker, period: 'quarterly', limit: 4 });
-        const latest = metrics.data[0];
+        const metrics = await tools.getFinancialMetrics.execute({
+          ticker,
+          period: 'quarterly',
+          limit: 4,
+        });
+        const latest = metrics?.financial_metrics?.[0];
         if (latest) {
-          if (latest.currentRatio && latest.currentRatio < 1) {
+          if (latest.current_ratio && latest.current_ratio < 1) {
             alerts.push({
               ticker,
               type: 'metric_deterioration',
               severity: 'warning',
-              message: `${ticker} current ratio below 1: ${latest.currentRatio}`,
-              details: { currentRatio: latest.currentRatio },
+              message: `${ticker} current ratio below 1: ${latest.current_ratio}`,
+              details: { currentRatio: latest.current_ratio },
               action: 'review',
             });
           }
-          if (latest.debtToEquity && latest.debtToEquity > 2) {
+          if (latest.debt_to_equity && latest.debt_to_equity > 2) {
             alerts.push({
               ticker,
               type: 'metric_deterioration',
               severity: 'warning',
-              message: `${ticker} high debt/equity: ${latest.debtToEquity}`,
-              details: { debtToEquity: latest.debtToEquity },
+              message: `${ticker} high debt/equity: ${latest.debt_to_equity}`,
+              details: { debtToEquity: latest.debt_to_equity },
               action: 'review',
             });
           }
@@ -444,14 +601,19 @@ OUTPUT FORMAT:
 
       const output = {
         alerts,
-        summary: `${alerts.length} alerts generated, ${alerts.filter(a => a.severity === 'critical').length} critical`,
+        summary: `${alerts.length} alerts generated, ${alerts.filter((a) => a.severity === 'critical').length} critical`,
         checkedAt: new Date().toISOString(),
       };
 
       this.updateTaskStatus(task.id, 'completed', output);
       return output;
     } catch (error) {
-      this.updateTaskStatus(task.id, 'failed', null, error instanceof Error ? error.message : 'Unknown error');
+      this.updateTaskStatus(
+        task.id,
+        'failed',
+        null,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       throw error;
     }
   }
@@ -463,12 +625,13 @@ OUTPUT FORMAT:
 
 export class ReportAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
-    super(createAgentConfig(
-      'report-agent',
-      'Report Agent',
-      'Generates professional investment reports',
-      'thinkingmachines/inkling-small:free', // Best for reports: multimodal, 1M context, efficient, non-expiring
-      `You are an Investment Report Agent. You create professional, well-structured reports.
+    super(
+      createAgentConfig(
+        'report-agent',
+        'Report Agent',
+        'Generates professional investment reports',
+        'thinkingmachines/inkling-small:free', // Best for reports: multimodal, 1M context, efficient, non-expiring
+        `You are an Investment Report Agent. You create professional, well-structured reports.
 
 REPORT TYPES:
 1. COMPANY REPORT: Deep dive on single company
@@ -487,20 +650,23 @@ REPORT STRUCTURE:
 - Appendix: Raw data, assumptions
 
 OUTPUT: Markdown formatted report ready for display/export`,
-      [],
-      15
-    ), financialDatasetsApiKey);
+        [],
+        15,
+      ),
+      financialDatasetsApiKey,
+    );
   }
 
   async execute(task: AgentTask): Promise<any> {
     const { type, data, template = 'company' } = task.input;
-    
+
     this.updateTaskStatus(task.id, 'running');
-    
+
     try {
       const { streamText } = await import('ai');
-      const model = getAllModels().find(m => m.id === this.config.modelId);
-      const modelInstance = customModel(model!.apiIdentifier, {
+      const model = getAllModels().find((m) => m.id === this.config.modelId);
+      if (!model) throw new Error(`Model ${this.config.modelId} not found`);
+      const modelInstance = customModel(model.apiIdentifier, {
         apiKey: process.env.OPENAI_API_KEY || '',
         baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
         name: process.env.OPENAI_PROVIDER_NAME || 'openai',
@@ -546,7 +712,12 @@ Create a comprehensive, well-formatted Markdown report with:
       this.updateTaskStatus(task.id, 'completed', output);
       return output;
     } catch (error) {
-      this.updateTaskStatus(task.id, 'failed', null, error instanceof Error ? error.message : 'Unknown error');
+      this.updateTaskStatus(
+        task.id,
+        'failed',
+        null,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
       throw error;
     }
   }

@@ -10,7 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getAllBuiltInModels, getAllModels, getCustomModels, removeCustomModel, getModelsForProvider } from '@/lib/ai/models';
+import {
+  getAllBuiltInModels,
+  getCustomModels,
+  removeCustomModel,
+  getModelsForProvider,
+} from '@/lib/ai/models';
 import { getDefaultProviderId } from '@/lib/db/api-keys';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +45,10 @@ export function ModelSelector({
   );
 
   const customModels = useMemo(
-    () => getCustomModels().filter(m => !m.providerId || m.providerId === providerId),
+    () =>
+      getCustomModels().filter(
+        (m) => !m.providerId || m.providerId === providerId,
+      ),
     [providerId, optimisticModelId],
   );
 
@@ -58,38 +66,43 @@ export function ModelSelector({
           <ChevronDownIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[300px] max-h-[400px] overflow-y-auto">
+      <DropdownMenuContent
+        align="start"
+        className="min-w-[300px] max-h-[400px] overflow-y-auto"
+      >
         {/* Default Models */}
         <div className="space-y-1">
-          {getAllBuiltInModels().filter(m => !m.providerId || m.providerId === providerId).map((model) => (
-            <DropdownMenuItem
-              key={model.id}
-              onSelect={() => {
-                setOpen(false);
+          {getAllBuiltInModels()
+            .filter((m) => !m.providerId || m.providerId === providerId)
+            .map((model) => (
+              <DropdownMenuItem
+                key={model.id}
+                onSelect={() => {
+                  setOpen(false);
 
-                startTransition(() => {
-                  setOptimisticModelId(model.id);
-                  saveModelId(model.id);
-                });
-              }}
-              className="gap-4 group/item flex flex-row justify-between items-center"
-              data-active={model.id === optimisticModelId}
-            >
-              <div className="flex flex-col gap-1 items-start">
-                {model.label}
-                {model.description && (
-                  <div className="text-xs text-muted-foreground">
-                    {model.description}
-                  </div>
-                )}
-              </div>
-              <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
-                <CheckCircleFillIcon />
-              </div>
-            </DropdownMenuItem>
-          ))}
+                  startTransition(() => {
+                    setOptimisticModelId(model.id);
+                    saveModelId(model.id);
+                  });
+                }}
+                className="gap-4 group/item flex flex-row justify-between items-center"
+                data-active={model.id === optimisticModelId}
+              >
+                <div className="flex flex-col gap-1 items-start">
+                  {model.label}
+                  {model.description && (
+                    <div className="text-xs text-muted-foreground">
+                      {model.description}
+                    </div>
+                  )}
+                </div>
+                <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
+                  <CheckCircleFillIcon />
+                </div>
+              </DropdownMenuItem>
+            ))}
         </div>
-        
+
         {/* Custom Models */}
         {customModels.length > 0 && (
           <>
@@ -115,7 +128,9 @@ export function ModelSelector({
                   <div className="flex flex-col gap-1 items-start pr-8">
                     <div className="flex items-center gap-1">
                       {model.label}
-                      <span className="text-xs text-muted-foreground bg-muted px-1 rounded">Custom</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-1 rounded">
+                        Custom
+                      </span>
                     </div>
                     {model.description && (
                       <div className="text-xs text-muted-foreground">
@@ -128,6 +143,7 @@ export function ModelSelector({
                       <CheckCircleFillIcon />
                     </div>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();

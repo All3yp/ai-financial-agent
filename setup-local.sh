@@ -4,6 +4,11 @@
 
 set -e  # Exit on error
 
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+pnpm install
+node scripts/setup-env.mjs
+
 echo "🚀 Setting up AI Financial Agent for local development..."
 
 # Colors for output
@@ -81,59 +86,6 @@ else
     echo -e "${GREEN}✅ Database '$DB_NAME' created${NC}"
 fi
 
-# Generate AUTH_SECRET
-echo -e "${YELLOW}🔐 Generating AUTH_SECRET...${NC}"
-AUTH_SECRET=$(openssl rand -base64 32)
-echo -e "${GREEN}✅ AUTH_SECRET generated${NC}"
-
-# Clean up .env file
-echo -e "${YELLOW}🧹 Cleaning up .env file...${NC}"
-
-cat > .env << EOF
-# AI Financial Agent - Local Development Configuration
-# Generated on $(date)
-
-# ============================================
-# REQUIRED - Core Configuration
-# ============================================
-
-# NextAuth.js - Session encryption (auto-generated)
-AUTH_SECRET=$AUTH_SECRET
-
-# OpenAI-compatible Provider (OpenRouter configured)
-OPENAI_API_KEY=
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_PROVIDER_NAME=openrouter
-
-# Database - Local PostgreSQL
-POSTGRES_URL=postgres://postgres:postgres@localhost:5432/ai_financial_agent
-
-# ============================================
-# OPTIONAL - External Services
-# ============================================
-
-# Financial Datasets API (for financial tools)
-# Get key at: https://financialdatasets.ai/
-FINANCIAL_DATASETS_API_KEY=
-
-# LangSmith Tracing (for observability)
-# Get key at: https://smith.langchain.com/
-LANGCHAIN_API_KEY=
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_PROJECT=ai-financial-agent
-
-# Vercel Blob Storage (for file uploads)
-# Created automatically when deploying to Vercel
-BLOB_READ_WRITE_TOKEN=
-EOF
-
-echo -e "${GREEN}✅ .env file cleaned and configured${NC}"
-
-# Install npm dependencies
-echo -e "${YELLOW}📦 Installing npm dependencies...${NC}"
-pnpm install
-echo -e "${GREEN}✅ Dependencies installed${NC}"
-
 # Run database migrations
 echo -e "${YELLOW}🔄 Running database migrations...${NC}"
 pnpm db:migrate
@@ -150,6 +102,7 @@ echo "1. Edit .env and add your API keys:"
 echo "   - OPENAI_API_KEY (your OpenRouter key)"
 echo "   - FINANCIAL_DATASETS_API_KEY (optional)"
 echo "   - LANGCHAIN_API_KEY (optional)"
+echo "   - SEC_USER_AGENT is configured automatically; existing values are preserved"
 echo ""
 echo "2. Start the development server:"
 echo -e "   ${GREEN}pnpm dev${NC}"

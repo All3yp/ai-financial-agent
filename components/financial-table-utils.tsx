@@ -1,7 +1,7 @@
 // Shared utilities for financial table components
 
 // Format large numbers in M/B notation with appropriate decimals
-export const formatFinancialValue = (value: any, decimals: number = 2) => {
+export const formatFinancialValue = (value: any, decimals = 2) => {
   if (typeof value !== 'number') return '-';
   
   if (Math.abs(value) >= 1e9) {
@@ -17,7 +17,7 @@ export const formatFinancialValue = (value: any, decimals: number = 2) => {
 };
 
 // Format currency values with $ prefix
-export const formatCurrencyValue = (value: any, decimals: number = 2) => {
+export const formatCurrencyValue = (value: any, decimals = 2) => {
   if (typeof value !== 'number') return '-';
   
   if (Math.abs(value) >= 1e9) {
@@ -55,19 +55,19 @@ export const formatPerShareValue = (value: any) => {
 };
 
 // Format percentage values
-export const formatPercentage = (value: any, decimals: number = 1) => {
+export const formatPercentage = (value: any, decimals = 1) => {
   if (typeof value !== 'number') return '-';
   return `${(value * 100).toFixed(decimals)}%`;
 };
 
 // Format ratio values
-export const formatRatio = (value: any, decimals: number = 2) => {
+export const formatRatio = (value: any, decimals = 2) => {
   if (typeof value !== 'number') return '-';
   return value.toFixed(decimals);
 };
 
 // Format "times" values (like turnover ratios)
-export const formatTimes = (value: any, decimals: number = 1) => {
+export const formatTimes = (value: any, decimals = 1) => {
   if (typeof value !== 'number') return '-';
   return `${value.toFixed(decimals)}x`;
 };

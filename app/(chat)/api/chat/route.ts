@@ -6,19 +6,18 @@ import {
   streamText,
 } from 'ai';
 import { z } from 'zod';
+import {
+  financialDataConfigSchema,
+  hasFinancialDataCredentials,
+  resolveFinancialDataConfig,
+  type FinancialDataConfig,
+} from '@/lib/api/financial-data-config';
 
 import { auth } from '@/app/(auth)/auth';
 import { customModel } from '@/lib/ai';
 import { getAllModels } from '@/lib/ai/models';
-import {
-  systemPrompt,
-} from '@/lib/ai/prompts';
-import {
-  deleteChatById,
-  getChatById,
-  saveChat,
-  saveMessages,
-} from '@/lib/db/queries';
+import { systemPrompt } from '@/lib/ai/prompts';
+import { getChatById, saveChat, saveMessages } from '@/lib/db/queries';
 import {
   generateUUID,
   getMostRecentUserMessage,
@@ -26,11 +25,10 @@ import {
 } from '@/lib/utils';
 
 import { generateTitleFromUserMessage } from '../../actions';
-import { AISDKExporter } from 'langsmith/vercel';
-import { 
-  FinancialToolsManager, 
-  financialTools, 
-  type AllowedTools 
+import {
+  FinancialToolsManager,
+  financialTools,
+  type AllowedTools,
 } from '@/lib/ai/tools/financial-tools';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +56,7 @@ export async function POST(request: Request) {
     modelId,
     modelFallback,
     financialDatasetsApiKey,
+    financialData,
     modelApiKey,
     modelBaseURL,
     modelProviderName,
@@ -67,6 +66,7 @@ export async function POST(request: Request) {
     modelId: string;
     modelFallback?: ModelFallbackConfig;
     financialDatasetsApiKey?: string;
+    financialData?: FinancialDataConfig;
     modelApiKey?: string;
     modelBaseURL?: string;
     modelProviderName?: string;
@@ -78,20 +78,38 @@ export async function POST(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  if (!modelApiKey) {
+    return new Response('Model API key is required', { status: 400 });
+  }
+
+  const parsedFinancialData = financialDataConfigSchema.optional().safeParse(financialData);
+  if (!parsedFinancialData.success) {
+    return new Response('Invalid financial data configuration', { status: 400 });
+  }
+  let resolvedFinancialData: FinancialDataConfig;
+  try {
+    resolvedFinancialData = resolveFinancialDataConfig(parsedFinancialData.data, financialDatasetsApiKey);
+  } catch {
+    return new Response('Invalid financial data provider configuration', { status: 400 });
+  }
+  if (!hasFinancialDataCredentials(resolvedFinancialData)) {
+    return new Response('API credentials for the selected financial data provider are required', { status: 400 });
+  }
+
   // Build the list of models to try (primary + fallbacks)
   const modelsToTry: ModelConfig[] = [];
-  
+
   // Add primary model
   const allModels = getAllModels();
   const primaryModel = allModels.find((m) => m.id === modelId);
   if (!primaryModel) {
     return new Response('Primary model not found', { status: 404 });
   }
-  
+
   modelsToTry.push({
     id: primaryModel.id,
     apiIdentifier: primaryModel.apiIdentifier,
-    apiKey: modelApiKey!,
+    apiKey: modelApiKey,
     baseURL: modelBaseURL,
     providerName: modelProviderName,
   });
@@ -112,10 +130,6 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!modelApiKey) {
-    return new Response('Model API key is required', { status: 400 });
-  }
-
   const coreMessages = convertToCoreMessages(messages);
   const userMessage = getMostRecentUserMessage(coreMessages);
 
@@ -126,8 +140,8 @@ export async function POST(request: Request) {
   const chat = await getChatById({ id });
 
   if (!chat) {
-    const title = await generateTitleFromUserMessage({ 
-      message: userMessage, 
+    const title = await generateTitleFromUserMessage({
+      message: userMessage,
       modelApiKey,
       modelBaseURL,
       modelProviderName,
@@ -147,7 +161,8 @@ export async function POST(request: Request) {
     execute: async (dataStream) => {
       // Initialize the financial tools manager
       const financialToolsManager = new FinancialToolsManager({
-        financialDatasetsApiKey: financialDatasetsApiKey!,
+        financialDatasetsApiKey,
+        financialData: resolvedFinancialData,
         dataStream,
       });
       dataStream.writeData({
@@ -159,18 +174,20 @@ export async function POST(request: Request) {
         type: 'query-loading',
         content: {
           isLoading: true,
-          taskNames: []
-        }
+          taskNames: [],
+        },
       });
 
       const { object } = await generateObject({
-        model: customModel('gpt-4.1-nano-2025-04-14', { apiKey: modelApiKey, baseURL: modelBaseURL, name: modelProviderName }),
+        model: customModel('gpt-4.1-nano-2025-04-14', {
+          apiKey: modelApiKey,
+          baseURL: modelBaseURL,
+          name: modelProviderName,
+        }),
         output: 'array',
         schema: z.object({
           task_name: z.string(),
-          class: z
-            .string()
-            .describe('The name of the sub-task'),
+          class: z.string().describe('The name of the sub-task'),
         }),
         prompt: `You are a financial reasoning agent.  
         Given the following user query: ${userMessage.content}, 
@@ -207,30 +224,34 @@ export async function POST(request: Request) {
         type: 'query-loading',
         content: {
           isLoading: true,
-          taskNames: object.map(task => task.task_name)
-        }
+          taskNames: object.map((task) => task.task_name),
+        },
       });
 
       let receivedFirstChunk = false;
 
       // Create a transient version of coreMessages with task names
       const coreMessagesWithTaskNames = [...coreMessages];
-      const lastMessage = coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1];
-      if (coreMessagesWithTaskNames.length > 0 && lastMessage?.role === 'user') {
-        const taskList = object.map(task => task.task_name).join('\n');
+      const lastMessage =
+        coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1];
+      if (
+        coreMessagesWithTaskNames.length > 0 &&
+        lastMessage?.role === 'user'
+      ) {
+        const taskList = object.map((task) => task.task_name).join('\n');
         coreMessagesWithTaskNames[coreMessagesWithTaskNames.length - 1] = {
           role: 'user',
-          content: taskList
+          content: taskList,
         };
       }
 
       // Try each model in sequence until one succeeds
       const lastErrorState: { error: Error | null } = { error: null };
-      
+
       for (let i = 0; i < modelsToTry.length; i++) {
         const modelConfig = modelsToTry[i];
         const isFallback = i > 0;
-        
+
         // Notify client which model is being tried
         dataStream.writeData({
           type: 'model-attempt',
@@ -239,7 +260,7 @@ export async function POST(request: Request) {
             isFallback,
             attemptNumber: i + 1,
             totalAttempts: modelsToTry.length,
-          }
+          },
         });
 
         const modelInstance = customModel(modelConfig.apiIdentifier, {
@@ -247,13 +268,13 @@ export async function POST(request: Request) {
           baseURL: modelConfig.baseURL,
           name: modelConfig.providerName,
         });
-        
+
         const modelErrorState: { error: Error | null } = { error: null };
         let finishResolve: () => void;
         const finishPromise = new Promise<void>((resolve) => {
           finishResolve = resolve;
         });
-        
+
         const result = streamText({
           model: modelInstance,
           tools: financialToolsManager.getTools(),
@@ -268,8 +289,8 @@ export async function POST(request: Request) {
                 type: 'query-loading',
                 content: {
                   isLoading: false,
-                  taskNames: []
-                }
+                  taskNames: [],
+                },
               });
             }
           },
@@ -277,7 +298,8 @@ export async function POST(request: Request) {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             if (session.user?.id) {
-              const responseMessagesWithoutIncompleteToolCalls = sanitizeResponseMessages(response.messages);
+              const responseMessagesWithoutIncompleteToolCalls =
+                sanitizeResponseMessages(response.messages);
 
               if (responseMessagesWithoutIncompleteToolCalls.length > 0) {
                 try {
@@ -299,7 +321,7 @@ export async function POST(request: Request) {
                           content: message.content,
                           createdAt: new Date(),
                         };
-                      }
+                      },
                     ),
                   });
                 } catch (error) {
@@ -311,7 +333,8 @@ export async function POST(request: Request) {
           },
         });
         result.text.catch((error: unknown) => {
-          const modelError = error instanceof Error ? error : new Error(String(error));
+          const modelError =
+            error instanceof Error ? error : new Error(String(error));
           modelErrorState.error = modelError;
           lastErrorState.error = modelError;
           console.error(`Model ${modelConfig.id} failed:`, modelError);
@@ -319,7 +342,7 @@ export async function POST(request: Request) {
         });
         // Wait for onFinish to complete
         await finishPromise;
-        
+
         // Check if model succeeded
         if (!modelErrorState.error) {
           // Notify success
@@ -328,22 +351,22 @@ export async function POST(request: Request) {
             content: {
               modelId: modelConfig.id,
               isFallback,
-            }
+            },
           });
-          
+
           return; // Exit the loop on success
         }
-        
+
         // Model failed, notify and continue to next
         dataStream.writeData({
           type: 'model-failed',
           content: {
             modelId: modelConfig.id,
             isFallback,
-              error: modelErrorState.error.message,
-          }
+            error: modelErrorState.error.message,
+          },
         });
-        
+
         // Continue to next model
         continue;
       }
@@ -355,7 +378,7 @@ export async function POST(request: Request) {
           content: {
             message: `All models failed. Last error: ${lastErrorState.error.message}`,
             code: 'ALL_MODELS_FAILED',
-          }
+          },
         });
       }
     },

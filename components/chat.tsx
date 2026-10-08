@@ -14,13 +14,12 @@ import {
   getDefaultProviderId,
   getProviderById,
   getLocalOpenAIApiKey,
-  ModelProviderConfig 
 } from '@/lib/db/api-keys';
 
 import { Block } from './block';
 import { MultimodalInput } from './multimodal-input';
 import { Messages } from './messages';
-import { VisibilityType } from './visibility-selector';
+import type { VisibilityType } from './visibility-selector';
 import { useBlockSelector } from '@/hooks/use-block';
 import { ApiKeysModal } from '@/components/api-keys-modal';
 

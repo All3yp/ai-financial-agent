@@ -9,7 +9,7 @@ interface ExtendedSession extends Session {
   user: User;
 }
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 // Utility to create a random fingerprint
 function createFingerprint(): string {

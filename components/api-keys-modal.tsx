@@ -1,28 +1,44 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, EyeOff, Plus, Trash2, Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { 
-  getProviders, 
-  addProvider, 
-  updateProvider, 
-  removeProvider, 
+import {
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
+import {
+  getProviders,
+  addProvider,
+  updateProvider,
+  removeProvider,
   setProviderAsDefault,
   getDefaultProviderId,
-  getFinancialDatasetsApiKey, 
-  setFinancialDatasetsApiKey
+  getFinancialDatasetsApiKey,
+  setFinancialDatasetsApiKey,
 } from '@/lib/db/api-keys';
 import { validateOpenAIKey } from '@/lib/utils/api-key-validation';
-import { addCustomModel, removeCustomModel, getCustomModels, Model, getAllModels } from '@/lib/ai/models';
-import { ModelProviderConfig } from '@/lib/db/api-keys';
-import { cn } from '@/lib/utils';
-
+import {
+  addCustomModel,
+  removeCustomModel,
+  getCustomModels,
+  type Model,
+  getAllModels,
+} from '@/lib/ai/models';
+import type { ModelProviderConfig } from '@/lib/db/api-keys';
 
 // Provider Models Section Component
 function ProviderModelsSection({
@@ -41,29 +57,31 @@ function ProviderModelsSection({
   const [showModels, setShowModels] = useState(false);
   const allModels = getAllModels(provider.id);
   const enabledModelIds = provider.enabledModelIds || [];
-  
+
   const handleToggleModel = (modelId: string) => {
     const newEnabled = enabledModelIds.includes(modelId)
-      ? enabledModelIds.filter(id => id !== modelId)
+      ? enabledModelIds.filter((id) => id !== modelId)
       : [...enabledModelIds, modelId];
     onUpdate(provider.id, { enabledModelIds: newEnabled });
   };
-  
+
   const handleSelectAll = () => {
     if (enabledModelIds.length === allModels.length) {
       onUpdate(provider.id, { enabledModelIds: [] });
     } else {
-      onUpdate(provider.id, { enabledModelIds: allModels.map(m => m.id) });
+      onUpdate(provider.id, { enabledModelIds: allModels.map((m) => m.id) });
     }
   };
-  
-  const isAllSelected = enabledModelIds.length === allModels.length && allModels.length > 0;
-  const isSomeSelected = enabledModelIds.length > 0 && enabledModelIds.length < allModels.length;
+
+  const isAllSelected =
+    enabledModelIds.length === allModels.length && allModels.length > 0;
+  const isSomeSelected =
+    enabledModelIds.length > 0 && enabledModelIds.length < allModels.length;
 
   return (
     <div>
-      <div 
-        key={provider.id} 
+      <div
+        key={provider.id}
         className={`flex items-center justify-between p-3 border rounded ${
           provider.id === defaultProviderId ? 'border-primary bg-primary/5' : ''
         }`}
@@ -74,11 +92,16 @@ function ProviderModelsSection({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium truncate">{provider.name}</span>
               {provider.id === 'default' && (
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Default</span>
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Default
+                </span>
               )}
-              {provider.id === defaultProviderId && provider.id !== 'default' && (
-                <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">Active</span>
-              )}
+              {provider.id === defaultProviderId &&
+                provider.id !== 'default' && (
+                  <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
+                )}
             </div>
             <div className="text-xs text-muted-foreground truncate">
               {provider.baseURL || 'https://api.openai.com/v1 (default)'}
@@ -94,12 +117,16 @@ function ProviderModelsSection({
             className="text-muted-foreground hover:text-primary"
             title={showModels ? 'Hide models' : 'Select models'}
           >
-            {showModels ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {showModels ? (
+              <ChevronDown size={14} />
+            ) : (
+              <ChevronRight size={14} />
+            )}
           </Button>
           {provider.id !== 'default' && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onRemove(provider.id)}
               className="text-muted-foreground hover:text-red-500"
               title="Remove provider"
@@ -109,7 +136,7 @@ function ProviderModelsSection({
           )}
         </div>
       </div>
-      
+
       {showModels && (
         <div className="ml-8 mt-2 border-l-2 border-muted pl-4 space-y-2">
           <div className="flex items-center justify-between mb-2">
@@ -127,7 +154,7 @@ function ProviderModelsSection({
           </div>
           <div className="max-h-60 overflow-y-auto space-y-1">
             {allModels.map((model) => (
-              <label
+              <div
                 key={model.id}
                 className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
               >
@@ -135,9 +162,13 @@ function ProviderModelsSection({
                   checked={enabledModelIds.includes(model.id)}
                   onCheckedChange={() => handleToggleModel(model.id)}
                 />
-                <span className="font-medium truncate max-w-[200px]">{model.label}</span>
-                <span className="text-xs text-muted-foreground">{model.id}</span>
-              </label>
+                <span className="font-medium truncate max-w-[200px]">
+                  {model.label}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {model.id}
+                </span>
+              </div>
             ))}
           </div>
         </div>
@@ -153,26 +184,28 @@ interface ApiKeysModalProps {
   description?: string;
 }
 
-export function ApiKeysModal({ 
-  open, 
-  onOpenChange, 
-  title = "Configure API keys",
-  description 
+export function ApiKeysModal({
+  open,
+  onOpenChange,
+  title = 'Configure API keys',
+  description,
 }: ApiKeysModalProps) {
   const [providers, setProviders] = useState<ModelProviderConfig[]>([]);
   const [defaultProviderId, setDefaultProviderId] = useState<string>('default');
-  const [financialKey, setFinancialKey] = useState(getFinancialDatasetsApiKey() || '');
+  const [financialKey, setFinancialKey] = useState(
+    getFinancialDatasetsApiKey() || '',
+  );
   const [showFinancialKey, setShowFinancialKey] = useState(false);
   const [openAIError, setOpenAIError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [newProviderName, setNewProviderName] = useState('');
   const [newProviderApiKey, setNewProviderApiKey] = useState('');
   const [newProviderBaseURL, setNewProviderBaseURL] = useState('');
   const [newProviderError, setNewProviderError] = useState<string>('');
-  
+
   // Custom models
   const [customModels, setCustomModels] = useState<Model[]>([]);
   const [showAddModel, setShowAddModel] = useState(false);
@@ -195,9 +228,12 @@ export function ApiKeysModal({
       setOpenAIError('');
 
       // Validate default provider
-      const defaultProvider = providers.find(p => p.id === defaultProviderId);
+      const defaultProvider = providers.find((p) => p.id === defaultProviderId);
       if (defaultProvider) {
-        const { isValid, error } = await validateOpenAIKey(defaultProvider.apiKey, defaultProvider.baseURL);
+        const { isValid, error } = await validateOpenAIKey(
+          defaultProvider.apiKey,
+          defaultProvider.baseURL,
+        );
         if (!isValid) {
           setOpenAIError(error ?? 'Invalid API key for default provider');
           return;
@@ -216,10 +252,13 @@ export function ApiKeysModal({
 
   const handleAddProvider = async () => {
     if (!newProviderName || !newProviderApiKey) return;
-    
+
     setNewProviderError('');
-    const { isValid, error } = await validateOpenAIKey(newProviderApiKey, newProviderBaseURL || undefined);
-    
+    const { isValid, error } = await validateOpenAIKey(
+      newProviderApiKey,
+      newProviderBaseURL || undefined,
+    );
+
     if (!isValid) {
       setNewProviderError(error ?? 'Invalid API key');
       return;
@@ -230,7 +269,7 @@ export function ApiKeysModal({
       apiKey: newProviderApiKey,
       baseURL: newProviderBaseURL || undefined,
     });
-    
+
     setProviders(getProviders());
     setShowAddProvider(false);
     setNewProviderName('');
@@ -250,7 +289,10 @@ export function ApiKeysModal({
     setDefaultProviderId(id);
   };
 
-  const handleUpdateProvider = (id: string, updates: Partial<ModelProviderConfig>) => {
+  const handleUpdateProvider = (
+    id: string,
+    updates: Partial<ModelProviderConfig>,
+  ) => {
     updateProvider(id, updates);
     setProviders(getProviders());
   };
@@ -261,7 +303,7 @@ export function ApiKeysModal({
 
   const handleAddCustomModel = () => {
     if (!newModelId || !newModelLabel) return;
-    
+
     const model: Model = {
       id: newModelId,
       label: newModelLabel,
@@ -269,7 +311,7 @@ export function ApiKeysModal({
       description: newModelDescription || 'Custom model',
       isCustom: true,
     };
-    
+
     addCustomModel(model);
     loadCustomModels();
     setShowAddModel(false);
@@ -283,7 +325,7 @@ export function ApiKeysModal({
     loadCustomModels();
   };
 
-  const defaultProvider = providers.find(p => p.id === 'default');
+  const defaultProvider = providers.find((p) => p.id === 'default');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -291,17 +333,14 @@ export function ApiKeysModal({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && (
-            <p className="text-sm text-muted-foreground">
-              {description}
-            </p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </DialogHeader>
         <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-          
           {/* Providers Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Model Providers</label>
+              <span className="text-sm font-medium">Model Providers</span>
               <button
                 type="button"
                 onClick={() => setShowAddProvider(true)}
@@ -310,7 +349,7 @@ export function ApiKeysModal({
                 <Plus size={14} /> Add Provider
               </button>
             </div>
-            
+
             {showAddProvider && (
               <div className="space-y-2 p-4 border rounded-lg bg-muted/50">
                 <div className="space-y-2">
@@ -352,14 +391,28 @@ export function ApiKeysModal({
                   <p className="text-sm text-red-500">{newProviderError}</p>
                 )}
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setShowAddProvider(false)}>Cancel</Button>
-                  <Button onClick={handleAddProvider} disabled={!newProviderName || !newProviderApiKey}>Add</Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAddProvider(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleAddProvider}
+                    disabled={!newProviderName || !newProviderApiKey}
+                  >
+                    Add
+                  </Button>
                 </div>
               </div>
             )}
-            
+
             {/* Providers List */}
-            <RadioGroup value={defaultProviderId} onValueChange={handleSetDefault} className="space-y-2">
+            <RadioGroup
+              value={defaultProviderId}
+              onValueChange={handleSetDefault}
+              className="space-y-2"
+            >
               {providers.map((provider) => (
                 <ProviderModelsSection
                   key={provider.id}
@@ -370,19 +423,20 @@ export function ApiKeysModal({
                   onUpdate={handleUpdateProvider}
                 />
               ))}
-              
+
               {providers.length === 0 && (
                 <div className="text-center py-4 text-muted-foreground">
-                  No providers configured. Add a provider or configure the default OpenAI provider.
+                  No providers configured. Add a provider or configure the
+                  default OpenAI provider.
                 </div>
               )}
             </RadioGroup>
           </div>
-          
+
           {/* Custom Models Section */}
           <div className="space-y-2 border-t pt-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Custom Models</label>
+              <span className="text-sm font-medium">Custom Models</span>
               <button
                 type="button"
                 onClick={() => setShowAddModel(!showAddModel)}
@@ -391,7 +445,7 @@ export function ApiKeysModal({
                 <Plus size={14} /> Add Model
               </button>
             </div>
-            
+
             {showAddModel && (
               <div className="space-y-2 p-4 border rounded-lg bg-muted/50">
                 <div className="space-y-2">
@@ -415,7 +469,9 @@ export function ApiKeysModal({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="custom-model-description">Description (Optional)</Label>
+                  <Label htmlFor="custom-model-description">
+                    Description (Optional)
+                  </Label>
                   <Input
                     id="custom-model-description"
                     type="text"
@@ -425,26 +481,44 @@ export function ApiKeysModal({
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setShowAddModel(false)}>Cancel</Button>
-                  <Button onClick={handleAddCustomModel} disabled={!newModelId || !newModelLabel}>Add</Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAddModel(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleAddCustomModel}
+                    disabled={!newModelId || !newModelLabel}
+                  >
+                    Add
+                  </Button>
                 </div>
               </div>
             )}
-            
+
             {customModels.length > 0 && (
               <div className="space-y-2">
                 {customModels.map((model) => (
-                  <div key={model.id} className="flex items-center justify-between p-2 border rounded">
+                  <div
+                    key={model.id}
+                    className="flex items-center justify-between p-2 border rounded"
+                  >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{model.label}</span>
-                        <span className="text-xs text-muted-foreground bg-muted px-1 rounded">{model.id}</span>
+                        <span className="text-xs text-muted-foreground bg-muted px-1 rounded">
+                          {model.id}
+                        </span>
                       </div>
                       {model.description && (
-                        <div className="text-xs text-muted-foreground">{model.description}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {model.description}
+                        </div>
                       )}
                     </div>
                     <button
+                      type="button"
                       onClick={() => handleRemoveCustomModel(model.id)}
                       className="text-muted-foreground hover:text-red-500 p-1"
                       title="Remove custom model"
@@ -456,7 +530,7 @@ export function ApiKeysModal({
               </div>
             )}
           </div>
-          
+
           {/* Financial Datasets API Key */}
           <div className="space-y-2 border-t pt-4">
             <Label htmlFor="financial-key" className="text-sm font-medium">
@@ -465,7 +539,7 @@ export function ApiKeysModal({
             <div className="relative">
               <Input
                 id="financial-key"
-                type={showFinancialKey ? "text" : "password"}
+                type={showFinancialKey ? 'text' : 'password'}
                 value={financialKey}
                 onChange={(e) => setFinancialKey(e.target.value)}
                 placeholder="Enter your Financial Datasets API key"
@@ -480,9 +554,9 @@ export function ApiKeysModal({
             </div>
             <p className="text-xs text-muted-foreground">
               Get your API key from{' '}
-              <a 
-                href="https://financialdatasets.ai" 
-                target="_blank" 
+              <a
+                href="https://financialdatasets.ai"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
@@ -499,4 +573,4 @@ export function ApiKeysModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}

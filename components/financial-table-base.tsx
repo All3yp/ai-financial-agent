@@ -79,7 +79,7 @@ export const defaultGetRowStyling = (item: BaseLineItem) => {
   }
 };
 
-export const defaultGetCellStyling = (item: BaseLineItem, isFirstCell: boolean = false) => {
+export const defaultGetCellStyling = (item: BaseLineItem, isFirstCell = false) => {
   const indentStyle = item.indentLevel > 0 && isFirstCell ? 
     { paddingLeft: `${1.5 + (item.indentLevel * 1.5)}rem` } : {};
   

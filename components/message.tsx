@@ -7,7 +7,7 @@ import { memo, useState } from 'react';
 
 import type { Vote } from '@/lib/db/schema';
 
-import { PencilEditIcon, SparklesIcon } from './icons';
+import { PencilEditIcon } from './icons';
 import { Markdown } from './markdown';
 import { MessageActions } from './message-actions';
 import { PreviewAttachment } from './preview-attachment';
@@ -19,7 +19,6 @@ import { MessageEditor } from './message-editor';
 import { FinancialsTable } from './financials-table';
 import { StockChart } from './ui/stock-chart';
 import { StockScreenerTable } from './stock-screener-table';
-import { Box } from 'lucide-react';
 import { News } from './ui/news';
 
 const PurePreviewMessage = ({
@@ -152,18 +151,14 @@ const PurePreviewMessage = ({
                             title="Financial Metrics"
                           />
                         ) : toolName === 'searchStocksByFilters' ? (
-                          <StockScreenerTable
-                            data={result.search_results}
-                          />
+                          <StockScreenerTable data={result.search_results} />
                         ) : (
                           <div />
                         )}
                       </div>
                     );
                   }
-                  return (
-                    <div key={toolCallId} />
-                  );
+                  return <div key={toolCallId} />;
                 })}
               </div>
             )}
@@ -213,14 +208,16 @@ export const ThinkingMessage = () => {
       data-role={role}
     >
       <div className="flex items-center gap-2">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
         <span className="text-sm text-[#9FA2A5]">Researching</span>
       </div>
     </motion.div>
   );
 };
 
-export const LoadingMessage = ({ loadingMessages }: { loadingMessages: string[] }) => {
+export const LoadingMessage = ({
+  loadingMessages,
+}: { loadingMessages: string[] }) => {
   const role = 'assistant';
 
   return (
@@ -240,9 +237,9 @@ export const LoadingMessage = ({ loadingMessages }: { loadingMessages: string[] 
       >
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-col gap-4 text-muted-foreground">
-            {loadingMessages.map((message, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+            {loadingMessages.map((message) => (
+              <div key={message} className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
                 <span className="text-sm text-[#9FA2A5]">{message}</span>
               </div>
             ))}

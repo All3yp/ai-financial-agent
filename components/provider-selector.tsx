@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { getProviders, getDefaultProviderId, setDefaultProviderId, getProviderById, ModelProviderConfig } from '@/lib/db/api-keys';
+import { getProviders, getDefaultProviderId, setDefaultProviderId, } from '@/lib/db/api-keys';
 import { cn } from '@/lib/utils';
 
 export function ProviderSelector({

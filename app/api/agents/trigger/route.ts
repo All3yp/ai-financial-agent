@@ -1,23 +1,18 @@
 // Agent Trigger API - Triggers agent workflows from UI
 // POST /api/agents/trigger
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
-import { 
-  initializeAgents, 
-  AgentOrchestrator, 
-  AgentWorkflow 
-} from '@/lib/agents';
-import { 
-  requestAnalysis, 
-  requestDebate, 
-  requestScreening, 
-  requestMonitoring 
+import { initializeAgents } from '@/lib/agents';
+import {
+  requestAnalysis,
+  requestDebate,
+  requestScreening,
+  requestMonitoring,
 } from '@/lib/agents/client';
 
 const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY || '';
 const agents = initializeAgents(FINANCIAL_DATASETS_API_KEY);
-const orchestrator = new AgentOrchestrator(FINANCIAL_DATASETS_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,12 +27,15 @@ export async function POST(request: NextRequest) {
       case 'analysis': {
         const { ticker, peers = [] } = data;
         if (!ticker) {
-          return NextResponse.json({ error: 'Ticker required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'Ticker required' },
+            { status: 400 },
+          );
         }
-        
+
         // Trigger via Inngest for background execution
         await requestAnalysis(ticker, peers, session.user.id);
-        
+
         // Also run synchronously for immediate feedback
         const researchData = await agents.research.execute({
           id: `research-${ticker}-${Date.now()}`,
@@ -61,25 +59,32 @@ export async function POST(request: NextRequest) {
           id: `report-${ticker}-${Date.now()}`,
           agentId: 'report-agent',
           type: 'report',
-          input: { type: 'company', data: { research: researchData, analysis, peers: {} }, template: 'company' },
+          input: {
+            type: 'company',
+            data: { research: researchData, analysis, peers: {} },
+            template: 'company',
+          },
           status: 'pending',
           createdAt: new Date(),
         });
 
-        return NextResponse.json({ 
-          success: true, 
-          data: { 
-            research: researchData, 
-            analysis, 
-            report: report.report 
-          } 
+        return NextResponse.json({
+          success: true,
+          data: {
+            research: researchData,
+            analysis,
+            report: report.report,
+          },
         });
       }
 
       case 'debate': {
         const { ticker, question } = data;
         if (!ticker) {
-          return NextResponse.json({ error: 'Ticker required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'Ticker required' },
+            { status: 400 },
+          );
         }
 
         await requestDebate(ticker, question, session.user.id);
@@ -104,7 +109,12 @@ export async function POST(request: NextRequest) {
             id: `bull-${ticker}-${Date.now()}`,
             agentId: 'analysis-agent',
             type: 'analysis',
-            input: { researchData, perspective: 'bull', instruction: 'Focus on upside potential, growth catalysts, competitive advantages. Be optimistic but grounded in data.' },
+            input: {
+              researchData,
+              perspective: 'bull',
+              instruction:
+                'Focus on upside potential, growth catalysts, competitive advantages. Be optimistic but grounded in data.',
+            },
             status: 'pending',
             createdAt: new Date(),
           }),
@@ -112,7 +122,12 @@ export async function POST(request: NextRequest) {
             id: `bear-${ticker}-${Date.now()}`,
             agentId: 'analysis-agent',
             type: 'analysis',
-            input: { researchData, perspective: 'bear', instruction: 'Focus on risks, downside scenarios, competitive threats, valuation concerns. Be pessimistic but grounded in data.' },
+            input: {
+              researchData,
+              perspective: 'bear',
+              instruction:
+                'Focus on risks, downside scenarios, competitive threats, valuation concerns. Be pessimistic but grounded in data.',
+            },
             status: 'pending',
             createdAt: new Date(),
           }),
@@ -122,9 +137,14 @@ export async function POST(request: NextRequest) {
         const { streamText } = await import('ai');
         const { customModel } = await import('@/lib/ai');
         const { getAllModels } = await import('@/lib/ai/models');
-        
-        const model = getAllModels().find(m => m.id === 'thinkingmachines/inkling:free');
-        const modelInstance = customModel(model!.apiIdentifier, {
+
+        const model = getAllModels().find(
+          (m) => m.id === 'thinkingmachines/inkling:free',
+        );
+        if (!model) {
+          throw new Error('Synthesis model is not configured');
+        }
+        const modelInstance = customModel(model.apiIdentifier, {
           apiKey: process.env.OPENAI_API_KEY || '',
           baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
           name: process.env.OPENAI_PROVIDER_NAME || 'openai',
@@ -152,7 +172,8 @@ Provide:
 
         const result = await streamText({
           model: modelInstance,
-          system: 'You are a Senior Investment Committee Member. Synthesize opposing views into a balanced, nuanced investment decision.',
+          system:
+            'You are a Senior Investment Committee Member. Synthesize opposing views into a balanced, nuanced investment decision.',
           messages: [{ role: 'user', content: prompt }],
           maxSteps: 1,
         });
@@ -166,27 +187,34 @@ Provide:
           id: `report-${ticker}-${Date.now()}`,
           agentId: 'report-agent',
           type: 'report',
-          input: { type: 'debate', data: { synthesis: fullText, bullCase, bearCase, researchData }, template: 'debate' },
+          input: {
+            type: 'debate',
+            data: { synthesis: fullText, bullCase, bearCase, researchData },
+            template: 'debate',
+          },
           status: 'pending',
           createdAt: new Date(),
         });
 
-        return NextResponse.json({ 
-          success: true, 
-          data: { 
-            synthesis: fullText, 
-            bullCase, 
-            bearCase, 
+        return NextResponse.json({
+          success: true,
+          data: {
+            synthesis: fullText,
+            bullCase,
+            bearCase,
             research: researchData,
-            report: report.report 
-          } 
+            report: report.report,
+          },
         });
       }
 
       case 'screening': {
         const { criteria } = data;
         if (!criteria) {
-          return NextResponse.json({ error: 'Criteria required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'Criteria required' },
+            { status: 400 },
+          );
         }
 
         await requestScreening(criteria, session.user.id);
@@ -206,7 +234,10 @@ Provide:
       case 'monitoring': {
         const { positions } = data;
         if (!positions || !Array.isArray(positions)) {
-          return NextResponse.json({ error: 'Positions array required' }, { status: 400 });
+          return NextResponse.json(
+            { error: 'Positions array required' },
+            { status: 400 },
+          );
         }
 
         await requestMonitoring(positions, session.user.id);
@@ -224,13 +255,19 @@ Provide:
       }
 
       default:
-        return NextResponse.json({ error: 'Unknown workflow type' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Unknown workflow type' },
+          { status: 400 },
+        );
     }
   } catch (error) {
     console.error('Agent trigger error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
+    );
   }
 }

@@ -3,7 +3,7 @@
 
 import { customModel } from '../ai';
 import { getAllModels } from '../ai/models';
-import { FinancialToolsManager, financialTools } from '../ai/tools/financial-tools';
+import { FinancialToolsManager } from '../ai/tools/financial-tools';
 import { generateUUID } from '../utils';
 
 // ============================================
@@ -82,14 +82,15 @@ class AgentMemory {
   }
 
   getMessages(toAgentId?: string, fromAgentId?: string): AgentMessage[] {
-    return this.messages.filter(m => 
-      (!toAgentId || m.toAgentId === toAgentId) &&
-      (!fromAgentId || m.fromAgentId === fromAgentId)
+    return this.messages.filter(
+      (m) =>
+        (!toAgentId || m.toAgentId === toAgentId) &&
+        (!fromAgentId || m.fromAgentId === fromAgentId),
     );
   }
 
   getMessagesByCorrelation(correlationId: string): AgentMessage[] {
-    return this.messages.filter(m => m.correlationId === correlationId);
+    return this.messages.filter((m) => m.correlationId === correlationId);
   }
 
   // Tasks
@@ -102,7 +103,7 @@ class AgentMemory {
   }
 
   getTasksByAgent(agentId: string): AgentTask[] {
-    return Array.from(this.tasks.values()).filter(t => t.agentId === agentId);
+    return Array.from(this.tasks.values()).filter((t) => t.agentId === agentId);
   }
 
   // Workflows
@@ -120,7 +121,11 @@ class AgentMemory {
 
   // Agent State
   setAgentState(agentId: string, state: any) {
-    this.agentStates.set(agentId, { ...this.agentStates.get(agentId), ...state, updatedAt: new Date() });
+    this.agentStates.set(agentId, {
+      ...this.agentStates.get(agentId),
+      ...state,
+      updatedAt: new Date(),
+    });
   }
 
   getAgentState(agentId: string): any {
@@ -149,7 +154,7 @@ export abstract class BaseAgent {
   abstract execute(task: AgentTask): Promise<any>;
 
   protected async callLLM(messages: any[], tools?: any) {
-    const model = getAllModels().find(m => m.id === this.config.modelId);
+    const model = getAllModels().find((m) => m.id === this.config.modelId);
     if (!model) throw new Error(`Model ${this.config.modelId} not found`);
 
     const modelInstance = customModel(model.apiIdentifier, {
@@ -170,7 +175,12 @@ export abstract class BaseAgent {
     return result;
   }
 
-  protected async sendMessage(toAgentId: string, type: AgentMessage['type'], payload: any, correlationId?: string) {
+  protected async sendMessage(
+    toAgentId: string,
+    type: AgentMessage['type'],
+    payload: any,
+    correlationId?: string,
+  ) {
     const message: AgentMessage = {
       id: generateUUID(),
       fromAgentId: this.config.id,
@@ -184,29 +194,39 @@ export abstract class BaseAgent {
     return message;
   }
 
-  protected async waitForResponse(correlationId: string, timeoutMs = 60000): Promise<AgentMessage | null> {
+  protected async waitForResponse(
+    correlationId: string,
+    timeoutMs = 60000,
+  ): Promise<AgentMessage | null> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const messages = agentMemory.getMessagesByCorrelation(correlationId);
-      const response = messages.find(m => 
-        m.toAgentId === this.config.id && 
-        m.type === 'response' &&
-        m.correlationId === correlationId
+      const response = messages.find(
+        (m) =>
+          m.toAgentId === this.config.id &&
+          m.type === 'response' &&
+          m.correlationId === correlationId,
       );
       if (response) return response;
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
     }
     return null;
   }
 
-  protected updateTaskStatus(taskId: string, status: AgentTask['status'], result?: any, error?: string) {
+  protected updateTaskStatus(
+    taskId: string,
+    status: AgentTask['status'],
+    result?: any,
+    error?: string,
+  ) {
     const task = agentMemory.getTask(taskId);
     if (task) {
       task.status = status;
       if (result) task.result = result;
       if (error) task.error = error;
       if (status === 'running') task.startedAt = new Date();
-      if (status === 'completed' || status === 'failed') task.completedAt = new Date();
+      if (status === 'completed' || status === 'failed')
+        task.completedAt = new Date();
       agentMemory.setTask(task);
     }
   }
@@ -241,7 +261,11 @@ export class AgentOrchestrator {
     this.financialDatasetsApiKey = financialDatasetsApiKey;
   }
 
-  async executeTask(agentId: string, taskType: string, input: any): Promise<any> {
+  async executeTask(
+    agentId: string,
+    taskType: string,
+    input: any,
+  ): Promise<any> {
     const agent = getAgent(agentId);
     if (!agent) throw new Error(`Agent ${agentId} not found`);
 
@@ -287,19 +311,25 @@ export class AgentOrchestrator {
     try {
       // Execute steps in dependency order
       const completedSteps = new Set<string>();
-      
+
       while (completedSteps.size < workflow.steps.length) {
         for (const step of workflow.steps) {
           if (completedSteps.has(step.id)) continue;
-          
+
           // Check dependencies
-          const depsMet = (step.dependsOn || []).every(dep => completedSteps.has(dep));
+          const depsMet = (step.dependsOn || []).every((dep) =>
+            completedSteps.has(dep),
+          );
           if (!depsMet) continue;
 
           // Execute step
           const input = this.resolveInput(step.input, stepResults);
-          const result = await this.executeTask(step.agentId, step.taskType, input);
-          
+          const result = await this.executeTask(
+            step.agentId,
+            step.taskType,
+            input,
+          );
+
           step.output = result;
           stepResults.set(step.id, result);
           completedSteps.add(step.id);
@@ -320,7 +350,11 @@ export class AgentOrchestrator {
   }
 
   private resolveInput(input: any, stepResults: Map<string, any>): any {
-    if (typeof input === 'string' && input.startsWith('{{') && input.endsWith('}}')) {
+    if (
+      typeof input === 'string' &&
+      input.startsWith('{{') &&
+      input.endsWith('}}')
+    ) {
       const stepId = input.slice(2, -2).trim();
       return stepResults.get(stepId);
     }
@@ -346,7 +380,7 @@ export function createAgentConfig(
   modelId: string,
   systemPrompt: string,
   tools?: string[],
-  maxSteps = 10
+  maxSteps = 10,
 ): AgentConfig {
   return { id, name, description, modelId, systemPrompt, tools, maxSteps };
 }

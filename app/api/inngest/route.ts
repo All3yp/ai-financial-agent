@@ -7,6 +7,9 @@ import {
   dailyScreening,
   runAnalysisWorkflow,
   runDebateWorkflow,
+  runMonitoringWorkflow,
+  runReportWorkflow,
+  runScreeningWorkflow,
 } from '@/lib/agents/inngest';
 import { serve } from 'inngest/next';
 
@@ -18,5 +21,8 @@ export const { GET, POST, PUT } = serve({
     dailyScreening,
     runAnalysisWorkflow,
     runDebateWorkflow,
+    runScreeningWorkflow,
+    runMonitoringWorkflow,
+    runReportWorkflow,
   ],
 });

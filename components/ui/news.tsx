@@ -10,7 +10,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from '@/components/ui/accordion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { Green } from '../styles/colors';
@@ -39,9 +39,9 @@ export function News({ data }: NewsProps) {
   const { news } = data;
 
   if (!news || news.length === 0) return null;
-  
+
   // Get ticker from news items if not provided directly
-  const ticker = (news.length > 0 ? news[0].ticker : '');
+  const ticker = news.length > 0 ? news[0].ticker : '';
 
   const handleScroll = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
@@ -50,12 +50,12 @@ export function News({ data }: NewsProps) {
     const cardWidth = 300; // Approximate width of a card
     const scrollAmount = direction === 'left' ? -cardWidth : cardWidth;
     const newPosition = scrollPosition + scrollAmount;
-    
+
     container.scrollTo({
       left: newPosition,
       behavior: 'smooth',
     });
-    
+
     setScrollPosition(newPosition);
   };
 
@@ -69,11 +69,7 @@ export function News({ data }: NewsProps) {
         <div className="border rounded-lg">
           <AccordionTrigger className="w-full px-4 py-2 hover:no-underline hover:bg-muted rounded-t-lg">
             <span className="flex flex-row items-center gap-2">
-              <FontAwesomeIcon
-                icon={faCheckCircle}
-                size={'sm'}
-                color={Green}
-              />
+              <FontAwesomeIcon icon={faCheckCircle} size={'sm'} color={Green} />
               <span className="text-muted-foreground text-sm">
                 {ticker ? `${ticker} (News)` : 'News'}
               </span>
@@ -83,16 +79,16 @@ export function News({ data }: NewsProps) {
             <div className="relative">
               {news.length > 3 && (
                 <>
-                  <Button 
-                    onClick={() => handleScroll('left')} 
+                  <Button
+                    onClick={() => handleScroll('left')}
                     className="absolute left-0 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 h-auto"
                     size="icon"
                     variant="ghost"
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </Button>
-                  <Button 
-                    onClick={() => handleScroll('right')} 
+                  <Button
+                    onClick={() => handleScroll('right')}
                     className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-full p-2 h-auto"
                     size="icon"
                     variant="ghost"
@@ -101,16 +97,16 @@ export function News({ data }: NewsProps) {
                   </Button>
                 </>
               )}
-              <div 
+              <div
                 ref={scrollContainerRef}
                 className="flex overflow-x-auto scrollbar-hide px-6 py-4 gap-4 snap-x"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
-                {news.map((item, index) => (
-                  <Link 
-                    href={item.url} 
-                    key={index} 
-                    target="_blank" 
+                {news.map((item) => (
+                  <Link
+                    href={item.url}
+                    key={`${item.url}-${item.date}`}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="snap-start"
                   >
@@ -135,7 +131,9 @@ export function News({ data }: NewsProps) {
                             {formatNewsDate(item.date)}
                           </span>
                         </div>
-                        <h3 className="text-sm font-medium line-clamp-3 mb-1">{item.title}</h3>
+                        <h3 className="text-sm font-medium line-clamp-3 mb-1">
+                          {item.title}
+                        </h3>
                       </div>
                     </div>
                   </Link>

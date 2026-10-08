@@ -1,4 +1,4 @@
-import { Suggestion } from '@/lib/db/schema';
+import type { Suggestion } from '@/lib/db/schema';
 
 export type ToolLoadingContent = {
   tool: string;

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/accordion";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
-import { Blue, ElectricViolet, Green } from './styles/colors';
+import { Green } from './styles/colors';
 
 interface BalanceSheetData {
   [key: string]: any;
@@ -137,7 +137,7 @@ export function BalanceSheetsTable({
   };
 
   // Format number values for financial data
-  const formatValue = (value: any, isShareCount: boolean = false) => {
+  const formatValue = (value: any, isShareCount = false) => {
     if (typeof value !== 'number') return '-';
     
     if (isShareCount) {
@@ -180,7 +180,7 @@ export function BalanceSheetsTable({
     }
   };
 
-  const getCellStyling = (item: LineItem, isFirstCell: boolean = false) => {
+  const getCellStyling = (item: LineItem, isFirstCell = false) => {
     const indentStyle = item.indentLevel > 0 && isFirstCell ? 
       { paddingLeft: `${1.5 + (item.indentLevel * 1.5)}rem` } : {};
     

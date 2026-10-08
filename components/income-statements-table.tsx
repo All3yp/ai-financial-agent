@@ -1,6 +1,6 @@
 'use client';
 
-import { FinancialTableBase, BaseFinancialData, BaseLineItem } from './financial-table-base';
+import { FinancialTableBase, type BaseFinancialData, type BaseLineItem } from './financial-table-base';
 import { formatFinancialValue, isPerShareField, isShareCountField, formatPerShareValue, formatShareCount } from './financial-table-utils';
 
 interface IncomeStatementData extends BaseFinancialData {

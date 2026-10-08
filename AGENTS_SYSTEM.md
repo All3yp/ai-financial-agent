@@ -110,6 +110,32 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 
 ## Data Access (Current)
 
+### Provider Selection
+
+Financial Datasets remains supported and is the default when its API key is
+configured. FMP, Alpha Vantage and Twelve Data are optional alternatives through
+the shared `FinancialDataClient`, used by chat and agent financial tools.
+
+- Set `FINANCIAL_DATA_PROVIDER` to `financial-datasets`, `fmp`, `alpha-vantage`,
+  `twelve-data`, or explicitly opt into `auto`.
+- Chat API requests may supply `financialData: { provider, apiKeys }`; the legacy
+  `financialDatasetsApiKey` field remains supported. Alternative keys can also be
+  configured on the server. The existing key dialog still manages Financial
+  Datasets only, not alternative provider keys.
+- `auto` prefers Twelve Data for daily prices and FMP for fundamentals/news,
+  then tries configured alternatives. Explicit provider selection never silently
+  falls back. Automatic retries across providers can consume multiple quotas.
+- Stock screening currently requires Financial Datasets. Twelve Data currently
+  supports daily prices only. Alpha Vantage statements do not support TTM;
+  its metrics are a latest TTM snapshot, and compact daily history covers at most
+  100 trading days. FMP endpoints may require a paid plan.
+- Missing normalized fields are `null`, not fabricated zeroes. Results carry
+  source, fetch time and warnings. Client-local caches use 60 seconds for
+  prices/news and 300 seconds for fundamentals; these are not distributed caches.
+- Free tiers, coverage, redistribution rights and prices must be checked with
+  each provider before deployment. Shibui/MCP is not integrated: its transport,
+  access policy and data contract still need verification.
+
 ### Available via Financial Datasets API:
 - ✅ Stock prices (historical + snapshot)
 - ✅ Income statements (quarterly/annual/TTM)
@@ -120,7 +146,9 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 - ✅ News headlines
 
 ### NOT Available (Gaps):
-- ❌ SEC Filings (10-K, 10-Q, 8-K parsing)
+- SEC discovery is available through `getSECFilings`: 10-K/10-Q/8-K metadata,
+  bounded historical pagination, optional amendments and official document/index
+  links. XBRL parsing and document section extraction remain unavailable.
 - ❌ Earnings call transcripts
 - ❌ Analyst estimates/ratings
 - ❌ Insider transactions (Form 4)
@@ -138,12 +166,67 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 
 ## TODO: Planned Improvements
 
+### Implementation Policy And Verified Progress
+
+Financial Datasets is retained, not replaced. Optional providers supplement it.
+Only tested behavior is marked complete; a tool name, placeholder, prompt or
+synthetic dataset does not count as a completed integration.
+
+The portfolio module implements a local subset of Phase 6. SEC discovery below
+implements only the first part of Phase 1. All other unchecked items remain
+backlog, not silently discarded or considered complete.
+
+Before implementing these items, resolve their concrete prerequisites:
+
+- Transcripts, estimates, guidance, short interest, options flow and alternative
+  data need verified endpoints, entitlements and usage rights. No assumption that
+  a free provider covers them; no paid subscription is activated automatically.
+- CME FedWatch, satellite, credit-card and SimilarWeb data are not treated as
+  freely scrapeable sources. Prefer an authorized API or user-provided data.
+- New specialist agents require the corresponding real data tools first;
+  prompts alone must not imply options, on-chain, FII or macro coverage.
+- Portfolio optimization, factor attribution and historical crisis scenarios
+  require separate numerical-model tests and actual aligned input data.
+- Vector/time-series stores, Redis, production Inngest, webhooks and streaming
+  require deployment configuration, credentials where applicable, persistence,
+  authorization and operational testing. Provider/tool caches are not substitutes.
+- Mode-specific yield and volatility figures below are design examples, not
+  validated targets or guarantees.
+
 ### Phase 1: Core Data Expansion (High Priority)
 
 - [ ] **SEC Filings Parser**
-  - [ ] `getSECFilings(ticker, formType: '10-K'|'10-Q'|'8-K')`
+  - [x] `getSECFilings({ ticker, formType: '10-K'|'10-Q'|'8-K', limit? })` - metadata and official links
+  - [x] Historical submissions pagination and amended-form support (bounded, with coverage metadata)
+  - [x] Automatic `SEC_USER_AGENT` configuration in local setup without erasing existing settings
   - [ ] XBRL parsing for financial statements
   - [ ] Section extraction (Risk Factors, MD&A, Business)
+
+SEC discovery uses `lib/api/sec-filings.ts` and is exposed by the shared tool
+manager. `bash setup-local.sh` configures `SEC_USER_AGENT` automatically, preserving
+an existing value or using `SEC_CONTACT_EMAIL`, the Git contact email, or an
+interactive contact prompt. GitHub noreply and example-domain addresses are not
+accepted as contacts. For unattended setup, provide a real contact through
+`SEC_CONTACT_EMAIL` or a full `SEC_USER_AGENT`. Existing `.env` values, comments,
+API keys and nonempty `AUTH_SECRET` are preserved on repeated setup. The helper
+can also be run alone with `node scripts/setup-env.mjs` after dependencies are
+installed; it does not install PostgreSQL or run migrations.
+
+No SEC API key is required. Requests are server-side, spaced at least 200ms
+apart per process, with a bounded five-minute client cache and a 15-second fetch
+timeout. There is no automatic retry on SEC blocks/429 responses. Multiple
+processes or deployments still need shared rate coordination to respect SEC's
+aggregate fair-access limit.
+
+Historical pages are enabled by default (`includeHistorical: true`), with up to
+five archive pages per query (`maxArchivePages`, configurable from 1 to 20).
+`includeHistorical: false` keeps requests to recent metadata. Set
+`includeAmendments: true` to include `/A` forms alongside the requested base form.
+Results merge, deduplicate by accession and sort before applying `limit`.
+`archivePagesRead`, `archivePagesAvailable` and `historyComplete` expose the
+coverage; reaching the page bound is never presented as a complete archive.
+Archive failures reject the query rather than silently returning partial data.
+This still returns discovery metadata, not filing text or parsed statements.
 
 - [ ] **Earnings Intelligence**
   - [ ] `getEarningsTranscripts(ticker, quarter)`
@@ -209,6 +292,16 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 - [ ] **FIIAgent** - Brazilian FIIs analysis (dividend yield, P/VP, vacancy)
 
 ### Phase 6: Portfolio & Risk Engine (High Priority)
+
+Implemented local subset: `lib/portfolio/risk.ts`, with fixture-based tests.
+It accepts caller-supplied, same-currency dated histories and current holdings.
+The broader checkboxes remain open because their full planned scope is not done.
+
+- [x] Historical VaR/CVaR, sample volatility, fixed-share drawdown and concentration
+- [x] Aligned Pearson return correlations (not PCA or factor models)
+- [x] Explicit caller-supplied stress scenarios (not historical crisis replay)
+- [x] Structured deterministic risk report with warnings and limitations
+- [ ] Connect risk reports to chat/agent tools and dashboard
 
 - [ ] `calculatePortfolioRisk(positions[])` - VaR, CVaR, factor exposure
 - [ ] `optimizePortfolio(constraints)` - Mean-variance, risk parity, HRP
@@ -306,6 +399,16 @@ OPENAI_BASE_URL=https://openrouter.ai/api/v1
 OPENAI_PROVIDER_NAME=openrouter
 FINANCIAL_DATASETS_API_KEY=your_financial_datasets_key
 
+# Optional data alternatives (only configure the providers you intend to use)
+# FINANCIAL_DATA_PROVIDER=fmp
+# FMP_API_KEY=your_fmp_key
+# ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+# TWELVE_DATA_API_KEY=your_twelve_data_key
+# Without an explicit selection, a configured Financial Datasets key takes priority.
+# SEC_USER_AGENT is generated by local setup from your existing identity or contact.
+# SEC_CONTACT_EMAIL=your-real-contact@your-domain.com  # unattended setup input
+# SEC_USER_AGENT="YourApp your-real-contact@your-domain.com"  # optional explicit override
+
 # Inngest (for background agents)
 INNGEST_EVENT_KEY=your_inngest_key
 INNGEST_SIGNING_KEY=your_inngest_signing_key
@@ -347,6 +450,18 @@ components/
 ---
 
 ## Next Steps for You
+
+### Automated Checks
+
+```bash
+node --test scripts/setup-env.test.mjs
+bash -n setup-local.sh
+pnpm exec tsx --test lib/api/financial-data-config.test.ts lib/api/financial-data.test.ts lib/api/sec-filings.test.ts lib/ai/tools/financial-tools.test.ts lib/agents/research.test.ts lib/portfolio/risk.test.ts
+pnpm exec tsc --noEmit --incremental false
+```
+
+These checks use fixtures and do not prove live-provider entitlements, freshness,
+SEC connectivity, deployment readiness or end-to-end model execution.
 
 1. **Test current system**: `pnpm dev` + `npx inngest-cli dev` → `/agents`
 2. **Run Full Analysis** on AAPL with peers MSFT, GOOGL
