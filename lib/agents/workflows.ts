@@ -7,6 +7,7 @@ import { agentMemory } from './base';
 import { initializeAgents } from './specialized';
 import { agentRunStore } from '@/lib/db/agent-runs';
 import { portfolioRepository } from '@/lib/db/portfolio';
+import { dueMonitoringOccurrence } from '@/lib/portfolio/schedule';
 import { sanitizeRunError } from './run-store';
 
 type WorkflowStepRunner = GetStepTools<typeof inngest>;
@@ -69,35 +70,39 @@ export const cleanupExpiredAgentRuns = inngest.createFunction(
 );
 
 // ============================================
-// Fixed UTC weekday/hour baseline; this is not exchange-calendar aware.
+// Quarter-hour dispatcher; individual portfolios are evaluated in their timezones.
 // ============================================
 
 export const scheduledMonitoring = inngest.createFunction(
   { id: 'scheduled-monitoring', name: 'Scheduled Portfolio Monitoring' },
-  { cron: '0 9-16 * * 1-5' },
+  { cron: '*/15 * * * *' },
   async ({ event, step }) => {
-    const occurrence =
-      typeof event.ts === 'number'
-        ? new Date(event.ts).toISOString().slice(0, 13)
-        : new Date().toISOString().slice(0, 13);
+    const instant = new Date(
+      typeof event.ts === 'number' ? event.ts : Date.now(),
+    );
     const portfolios = await step.run('get-enabled-portfolios', () =>
       portfolioRepository.listEnabledPortfoliosForMonitoring(),
     );
 
-    if (portfolios.length === 0) {
-      return { message: 'No portfolios to monitor' };
+    const duePortfolios = portfolios.flatMap((portfolio) => {
+      const occurrence = dueMonitoringOccurrence(portfolio, instant);
+      return occurrence ? [{ portfolio, occurrence }] : [];
+    });
+
+    if (duePortfolios.length === 0) {
+      return { message: 'No opted-in portfolios are due for monitoring' };
     }
 
     // Run monitor agent for each portfolio
     const results = await Promise.all(
-      portfolios.map(async (portfolio) => {
+      duePortfolios.map(async ({ portfolio, occurrence }) => {
         const creation = await step.run(
           `create-monitor-run-${portfolio.portfolioId}`,
           () =>
             agentRunStore.createScheduledMonitoringRun(
               portfolio.userId,
               portfolio.portfolioId,
-              `scheduled:${occurrence}`,
+              occurrence,
               portfolio.positions,
             ),
         );
@@ -181,7 +186,7 @@ export const scheduledMonitoring = inngest.createFunction(
     }
 
     return {
-      monitored: portfolios.length,
+      monitored: duePortfolios.length,
       alerts: results.flatMap((r) => r.alerts).length,
       skipped: results.filter((result) => 'skipped' in result).length,
     };

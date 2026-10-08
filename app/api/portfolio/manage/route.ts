@@ -17,11 +17,27 @@ export async function GET(): Promise<Response> {
     return Response.json(
       {
         portfolios: portfolios.map(
-          ({ id, name, currency, monitoringEnabled, holdings }) => ({
+          ({
             id,
             name,
             currency,
             monitoringEnabled,
+            monitoringFrequency,
+            monitoringTime,
+            monitoringTimezone,
+            monitoringDayOfWeek,
+            monitoringDayOfMonth,
+            holdings,
+          }) => ({
+            id,
+            name,
+            currency,
+            monitoringEnabled,
+            monitoringFrequency,
+            monitoringTime,
+            monitoringTimezone,
+            monitoringDayOfWeek,
+            monitoringDayOfMonth,
             holdings,
           }),
         ),

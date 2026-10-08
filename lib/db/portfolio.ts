@@ -32,6 +32,11 @@ function toPortfolioRecord(
     name: row.name,
     currency: row.currency,
     monitoringEnabled: row.monitoringEnabled,
+    monitoringFrequency: row.monitoringFrequency,
+    monitoringTime: row.monitoringTime,
+    monitoringTimezone: row.monitoringTimezone,
+    monitoringDayOfWeek: row.monitoringDayOfWeek,
+    monitoringDayOfMonth: row.monitoringDayOfMonth,
     holdings: holdings.map(({ ticker, shares, costBasis }) => ({
       ticker,
       shares,
@@ -163,6 +168,11 @@ export const portfolioRepository: PortfolioRepository &
           name: input.name,
           currency: input.currency,
           monitoringEnabled: input.monitoringEnabled,
+          monitoringFrequency: input.monitoringFrequency,
+          monitoringTime: input.monitoringTime,
+          monitoringTimezone: input.monitoringTimezone,
+          monitoringDayOfWeek: input.monitoringDayOfWeek,
+          monitoringDayOfMonth: input.monitoringDayOfMonth,
         })
         .returning();
       if (input.holdings.length) {
@@ -198,6 +208,11 @@ export const portfolioRepository: PortfolioRepository &
           name: input.name,
           currency: input.currency,
           monitoringEnabled: input.monitoringEnabled,
+          monitoringFrequency: input.monitoringFrequency,
+          monitoringTime: input.monitoringTime,
+          monitoringTimezone: input.monitoringTimezone,
+          monitoringDayOfWeek: input.monitoringDayOfWeek,
+          monitoringDayOfMonth: input.monitoringDayOfMonth,
           updatedAt: new Date(),
         })
         .where(and(eq(portfolio.id, id), eq(portfolio.userId, userId)))
@@ -341,6 +356,11 @@ export const portfolioRepository: PortfolioRepository &
         id: portfolio.id,
         userId: portfolio.userId,
         currency: portfolio.currency,
+        monitoringFrequency: portfolio.monitoringFrequency,
+        monitoringTime: portfolio.monitoringTime,
+        monitoringTimezone: portfolio.monitoringTimezone,
+        monitoringDayOfWeek: portfolio.monitoringDayOfWeek,
+        monitoringDayOfMonth: portfolio.monitoringDayOfMonth,
       })
       .from(portfolio)
       .where(eq(portfolio.monitoringEnabled, true));
@@ -367,6 +387,11 @@ export const portfolioRepository: PortfolioRepository &
         portfolioId: row.id,
         userId: row.userId,
         currency: row.currency,
+        frequency: row.monitoringFrequency,
+        time: row.monitoringTime,
+        timezone: row.monitoringTimezone,
+        dayOfWeek: row.monitoringDayOfWeek,
+        dayOfMonth: row.monitoringDayOfMonth,
         positions: (grouped.get(row.id) ?? []).map(
           ({ ticker, shares, costBasis }) => ({
             ticker,
@@ -394,6 +419,11 @@ export const portfolioRepository: PortfolioRepository &
             set: {
               currency: input.currency,
               monitoringEnabled: input.monitoringEnabled,
+              monitoringFrequency: input.monitoringFrequency,
+              monitoringTime: input.monitoringTime,
+              monitoringTimezone: input.monitoringTimezone,
+              monitoringDayOfWeek: input.monitoringDayOfWeek,
+              monitoringDayOfMonth: input.monitoringDayOfMonth,
               updatedAt: new Date(),
             },
           })

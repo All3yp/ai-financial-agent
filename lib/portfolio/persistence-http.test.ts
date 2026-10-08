@@ -44,6 +44,11 @@ class MemoryRepository implements PortfolioRepository {
         portfolioId: record.id,
         userId: owner,
         currency: record.currency,
+        frequency: record.monitoringFrequency,
+        time: record.monitoringTime,
+        timezone: record.monitoringTimezone,
+        dayOfWeek: record.monitoringDayOfWeek,
+        dayOfMonth: record.monitoringDayOfMonth,
         positions: record.holdings.map(({ ticker, shares, costBasis }) => ({
           ticker,
           shares,
@@ -169,6 +174,11 @@ const portfolioInput: PortfolioInput = {
   name: 'Long term',
   currency: 'USD',
   monitoringEnabled: false,
+  monitoringFrequency: 'daily',
+  monitoringTime: '09:00',
+  monitoringTimezone: 'UTC',
+  monitoringDayOfWeek: 1,
+  monitoringDayOfMonth: 1,
   holdings: [{ ticker: 'AAPL', shares: 3, costBasis: 180 }],
 };
 

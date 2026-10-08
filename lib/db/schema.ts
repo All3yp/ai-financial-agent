@@ -13,6 +13,7 @@ import {
   unique,
   date,
   index,
+  integer,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -128,6 +129,19 @@ export const portfolio = pgTable(
     name: varchar('name', { length: 100 }).notNull(),
     currency: varchar('currency', { length: 3 }).notNull(),
     monitoringEnabled: boolean('monitoringEnabled').notNull().default(false),
+    monitoringFrequency: varchar('monitoringFrequency', {
+      enum: ['daily', 'weekly', 'monthly'],
+    })
+      .notNull()
+      .default('daily'),
+    monitoringTime: varchar('monitoringTime', { length: 5 })
+      .notNull()
+      .default('09:00'),
+    monitoringTimezone: varchar('monitoringTimezone', { length: 64 })
+      .notNull()
+      .default('UTC'),
+    monitoringDayOfWeek: integer('monitoringDayOfWeek').notNull().default(1),
+    monitoringDayOfMonth: integer('monitoringDayOfMonth').notNull().default(1),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
   },

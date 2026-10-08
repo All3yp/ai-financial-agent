@@ -13,6 +13,19 @@ const holdingSchema = z
     costBasis: z.number().finite().nonnegative().nullable().optional(),
   })
   .strict();
+const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .refine((timezone) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+      return true;
+    } catch {
+      return false;
+    }
+  });
 
 export const portfolioInputSchema = z
   .object({
@@ -23,6 +36,16 @@ export const portfolioInputSchema = z
       .toUpperCase()
       .regex(/^[A-Z]{3}$/),
     monitoringEnabled: z.boolean().default(false),
+    monitoringFrequency: z
+      .enum(['daily', 'weekly', 'monthly'])
+      .default('daily'),
+    monitoringTime: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/)
+      .default('09:00'),
+    monitoringTimezone: timezoneSchema.default('UTC'),
+    monitoringDayOfWeek: z.number().int().min(0).max(6).default(1),
+    monitoringDayOfMonth: z.number().int().min(1).max(28).default(1),
     holdings: z.array(holdingSchema).max(100),
   })
   .strict()
@@ -220,6 +243,11 @@ export type ScheduledMonitoringPortfolio = {
   portfolioId: string;
   userId: string;
   currency: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  time: string;
+  timezone: string;
+  dayOfWeek: number;
+  dayOfMonth: number;
   positions: Array<{
     ticker: string;
     shares: number;

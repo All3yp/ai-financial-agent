@@ -278,20 +278,21 @@ migrations.
 - [x] Add idempotency keys, bounded manual-run concurrency and per-user limits.
 - [ ] Extend configurable execution limits and schedule controls to scheduled
   workflows.
-- [ ] Make scheduled monitoring query only enabled, owner-authorized portfolios;
-  let users configure frequency, timezone and pause/resume, and account for
-  market sessions, daylight-saving changes, holidays, stale data and provider
-  quotas. Do not describe the current UTC weekday crons as exchange-hours aware.
+- [ ] Complete scheduled monitoring policy for exchange sessions, holidays,
+  stale data and provider quotas; do not describe it as exchange-hours aware.
 
 Portfolio CRUD includes `monitoringEnabled`, which defaults to `false`; the
 scheduled monitor queries only opted-in owner-scoped portfolios with holdings.
 Each portfolio/hour run has a durable status, step result and sanitized error,
 and retries reuse its portfolio-scoped occurrence key. This setting is available
-through the authenticated portfolio API and import/export, but there is not yet
-a dashboard control. The cron remains the fixed `0 9-16 * * 1-5` UTC schedule;
-it does not honor per-user timezones, frequency, exchange sessions, daylight-
-saving transitions or holidays. Stale-price gating and alert delivery remain
-unimplemented.
+through the authenticated portfolio API and import/export. The dashboard offers
+daily, weekly or monthly frequency, a local time on 15-minute boundaries, an
+IANA timezone and pause/resume. Monthly dates are limited to 1-28 so every
+configured month has a due date. A 15-minute UTC dispatcher evaluates local
+dates, including timezone offset changes; a configured wall time that does not
+exist during a spring DST transition is skipped until its next occurrence.
+Schedules do not skip holidays or market closures, and stale-price gating and
+provider quota coordination remain unimplemented.
 
 - [ ] Add an opt-in notification outbox with deduplication, bounded retries,
   throttling, delivery status, quiet hours and revocation. Begin with concise

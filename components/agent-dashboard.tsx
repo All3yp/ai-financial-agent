@@ -65,6 +65,11 @@ interface ManagedPortfolio {
   name: string;
   currency: string;
   monitoringEnabled: boolean;
+  monitoringFrequency: 'daily' | 'weekly' | 'monthly';
+  monitoringTime: string;
+  monitoringTimezone: string;
+  monitoringDayOfWeek: number;
+  monitoringDayOfMonth: number;
   holdings: Array<{ ticker: string; shares: number; costBasis: number | null }>;
 }
 
@@ -216,9 +221,9 @@ export function AgentDashboard() {
     };
   }, [activeTab]);
 
-  const setPortfolioMonitoring = async (
+  const updatePortfolioMonitoring = async (
     portfolio: ManagedPortfolio,
-    enabled: boolean,
+    changes: Partial<ManagedPortfolio>,
   ) => {
     setUpdatingPortfolioId(portfolio.id);
     try {
@@ -228,8 +233,14 @@ export function AgentDashboard() {
         body: JSON.stringify({
           name: portfolio.name,
           currency: portfolio.currency,
-          monitoringEnabled: enabled,
+          monitoringEnabled: portfolio.monitoringEnabled,
+          monitoringFrequency: portfolio.monitoringFrequency,
+          monitoringTime: portfolio.monitoringTime,
+          monitoringTimezone: portfolio.monitoringTimezone,
+          monitoringDayOfWeek: portfolio.monitoringDayOfWeek,
+          monitoringDayOfMonth: portfolio.monitoringDayOfMonth,
           holdings: portfolio.holdings,
+          ...changes,
         }),
       });
       if (!response.ok)
@@ -691,8 +702,8 @@ export function AgentDashboard() {
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-medium mb-2">Monitoring Consent</h4>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Scheduled checks use the fixed UTC weekday cadence shown
-                  below. No portfolio is monitored until you enable it.
+                  Choose when each portfolio is checked. Monitoring remains off
+                  until enabled; run times use the selected IANA timezone.
                 </p>
                 {monitoringError ? (
                   <p role="alert" className="mb-3 text-sm text-destructive">
@@ -713,20 +724,20 @@ export function AgentDashboard() {
                 ) : null}
                 <div className="divide-y">
                   {managedPortfolios.map((portfolio) => (
-                    <label
+                    <div
                       key={portfolio.id}
-                      className="flex items-center justify-between gap-4 py-3"
+                      className="grid gap-3 py-4 md:grid-cols-[minmax(10rem,1fr)_repeat(3,minmax(8rem,auto))] md:items-center"
                     >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
                           {portfolio.name}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
+                        </p>
+                        <p className="text-xs text-muted-foreground">
                           {portfolio.holdings.length} holdings ·{' '}
                           {portfolio.currency}
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2 text-sm">
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
                           checked={portfolio.monitoringEnabled}
@@ -735,36 +746,147 @@ export function AgentDashboard() {
                             portfolio.holdings.length === 0
                           }
                           onChange={(event) =>
-                            void setPortfolioMonitoring(
-                              portfolio,
-                              event.target.checked,
-                            )
+                            void updatePortfolioMonitoring(portfolio, {
+                              monitoringEnabled: event.target.checked,
+                            })
                           }
                           aria-label={`Enable scheduled monitoring for ${portfolio.name}`}
                         />
-                        {updatingPortfolioId === portfolio.id
-                          ? 'Saving...'
-                          : portfolio.monitoringEnabled
-                            ? 'Enabled'
-                            : 'Off'}
-                      </span>
-                    </label>
+                        Monitor
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Repeats</span>
+                        <select
+                          className="h-9 rounded-md border bg-background px-2"
+                          value={portfolio.monitoringFrequency}
+                          disabled={updatingPortfolioId === portfolio.id}
+                          onChange={(event) =>
+                            void updatePortfolioMonitoring(portfolio, {
+                              monitoringFrequency: event.target
+                                .value as ManagedPortfolio['monitoringFrequency'],
+                            })
+                          }
+                          aria-label={`Monitoring frequency for ${portfolio.name}`}
+                        >
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {portfolio.monitoringFrequency === 'weekly' ? (
+                          <label className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Day</span>
+                            <select
+                              className="h-9 rounded-md border bg-background px-2"
+                              value={portfolio.monitoringDayOfWeek}
+                              disabled={updatingPortfolioId === portfolio.id}
+                              onChange={(event) =>
+                                void updatePortfolioMonitoring(portfolio, {
+                                  monitoringDayOfWeek: Number(
+                                    event.target.value,
+                                  ),
+                                })
+                              }
+                              aria-label={`Monitoring weekday for ${portfolio.name}`}
+                            >
+                              <option value={1}>Monday</option>
+                              <option value={2}>Tuesday</option>
+                              <option value={3}>Wednesday</option>
+                              <option value={4}>Thursday</option>
+                              <option value={5}>Friday</option>
+                              <option value={6}>Saturday</option>
+                              <option value={0}>Sunday</option>
+                            </select>
+                          </label>
+                        ) : null}
+                        {portfolio.monitoringFrequency === 'monthly' ? (
+                          <label className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Day</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={28}
+                              className="h-9 w-16 rounded-md border bg-background px-2"
+                              value={portfolio.monitoringDayOfMonth}
+                              disabled={updatingPortfolioId === portfolio.id}
+                              onChange={(event) =>
+                                void updatePortfolioMonitoring(portfolio, {
+                                  monitoringDayOfMonth: Number(
+                                    event.target.value,
+                                  ),
+                                })
+                              }
+                              aria-label={`Monitoring day of month for ${portfolio.name}`}
+                            />
+                          </label>
+                        ) : null}
+                        <label className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">At</span>
+                          <input
+                            type="time"
+                            step={900}
+                            className="h-9 rounded-md border bg-background px-2"
+                            value={portfolio.monitoringTime}
+                            disabled={updatingPortfolioId === portfolio.id}
+                            onChange={(event) =>
+                              void updatePortfolioMonitoring(portfolio, {
+                                monitoringTime: event.target.value,
+                              })
+                            }
+                            aria-label={`Monitoring time for ${portfolio.name}`}
+                          />
+                        </label>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm md:col-start-2 md:col-span-3">
+                        <span className="text-muted-foreground">Timezone</span>
+                        <input
+                          type="text"
+                          maxLength={64}
+                          className="h-9 min-w-0 rounded-md border bg-background px-2"
+                          value={portfolio.monitoringTimezone}
+                          disabled={updatingPortfolioId === portfolio.id}
+                          onChange={(event) =>
+                            setManagedPortfolios((current) =>
+                              current.map((item) =>
+                                item.id === portfolio.id
+                                  ? {
+                                      ...item,
+                                      monitoringTimezone: event.target.value,
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                          onBlur={() =>
+                            void updatePortfolioMonitoring(portfolio, {
+                              monitoringTimezone: portfolio.monitoringTimezone,
+                            })
+                          }
+                          aria-label={`IANA timezone for ${portfolio.name}`}
+                          placeholder="America/New_York"
+                        />
+                        {updatingPortfolioId === portfolio.id ? (
+                          <span className="text-xs text-muted-foreground">
+                            Saving...
+                          </span>
+                        ) : null}
+                      </label>
+                    </div>
                   ))}
                 </div>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-medium mb-2">Fixed UTC Schedule</h4>
+                <h4 className="font-medium mb-2">Schedule Limits</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Portfolio Monitoring</span>
-                    <Badge variant="default">
-                      Hourly, 09:00-16:00 UTC, Mon-Fri
-                    </Badge>
-                  </div>
                   <div className="flex justify-between">
                     <span>Daily Screening</span>
                     <Badge variant="default">5PM Mon-Fri (after market)</Badge>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Portfolio schedules use a 15-minute dispatcher. Exchange
+                    holidays and market sessions are not applied.
+                  </p>
                 </div>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">

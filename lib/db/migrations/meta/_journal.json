@@ -99,6 +99,13 @@
       "when": 1791473414913,
       "tag": "0013_scoped_scheduled_run_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791474018787,
+      "tag": "0014_configurable_portfolio_monitoring_schedule",
+      "breakpoints": true
     }
   ]
 }
