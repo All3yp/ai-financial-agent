@@ -1,0 +1,2 @@
+ALTER TABLE "PortfolioPriceHistory" DROP CONSTRAINT "PortfolioPriceHistory_portfolioId_ticker_source_adjustmentBasis_asOf_unique";--> statement-breakpoint
+ALTER TABLE "PortfolioPriceHistory" ADD CONSTRAINT "PortfolioPriceHistory_portfolioId_ticker_source_unique" UNIQUE("portfolioId","ticker","source");

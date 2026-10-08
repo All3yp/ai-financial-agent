@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "PortfolioPriceHistory_portfolioId_ticker_asOf_index" ON "PortfolioPriceHistory" USING btree ("portfolioId","ticker","asOf");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "PortfolioSnapshot_portfolioId_createdAt_id_index" ON "PortfolioSnapshot" USING btree ("portfolioId","createdAt","id");

@@ -211,9 +211,10 @@ Before implementing these items, resolve their concrete prerequisites:
 
 These prerequisites come before promising unattended monitoring or remote
 notifications. Owner-scoped portfolio and watchlist tables now exist, but
-holding snapshots, schedules, runs, reports and notifications are not yet
-persisted; Inngest is wired, but some scheduled steps are placeholders and the
-trigger can execute the same request synchronously and as a background event.
+holding snapshots and caller-submitted price histories are persisted. Schedules,
+runs, reports and notifications are not yet persisted; Inngest is wired, but
+some scheduled steps are placeholders and the trigger can execute the same
+request synchronously and as a background event.
 
 - [x] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
   validated CRUD, import/export, and tests for cross-user isolation.
@@ -233,10 +234,24 @@ Every record lookup and mutation is owner-filtered; foreign IDs return the same
 import/export behavior has fixture-backed coverage in
 `lib/portfolio/persistence-http.test.ts`.
 
-- [ ] Store holding snapshots and sourced price histories with currency,
+- [x] Store holding snapshots and sourced price histories with currency,
   adjustment basis, source, observed-at/as-of timestamps and staleness checks;
   do not treat manually uploaded quantitative JSON as an automatically updated
   portfolio.
+
+`POST /api/portfolio/[id]/snapshots` captures the portfolio's current holdings
+and caller-supplied prices as an immutable snapshot; `GET` lists snapshots in
+100-record cursor pages. `POST /api/portfolio/[id]/price-history` saves up to 12
+histories of 251 dated prices each; repeated submissions replace the rolling
+series for that portfolio/ticker/source, and `GET` reads those series. Both
+endpoints require an existing owner-scoped portfolio, exact portfolio currency,
+valid observed-at/as-of dates no more than seven days old, and explicit source
+and adjustment-basis fields. Source and adjustment claims are caller-declared,
+not independently verified; `unknown` adjustment basis is retained as unknown.
+The current shared price client does not establish currency or adjustment
+basis, so these endpoints do not automatically fetch prices or connect captured
+data to the risk/quantitative tools. Manual quantitative JSON uploads remain
+separate and never create or refresh these records.
 - [ ] Persist job runs, statuses, step results, errors, reports and screening
   results; connect dashboard History/status to those records and define retention.
 - [ ] Choose one trigger contract: queued/background with run ID and status
@@ -405,7 +420,9 @@ The broader checkboxes remain open because their full planned scope is not done.
 - [x] Authenticated REST API: `POST /api/portfolio/risk`
 - [x] Local CLI: `pnpm portfolio:report input.json`
 - [x] Quantitative dashboard with JSON upload, regime/horizons/sector rankings, optional risk metrics, conflicts and report export
-- [ ] Sourced-history acquisition and persistent portfolio ingestion
+- [ ] Automatic sourced-history acquisition, provider-verified provenance and
+  ingestion into quantitative reports; caller-submitted snapshots/history are
+  persisted separately and are not wired into those tools.
 
 The shared risk tool, REST API and CLI reuse strict validation and never call
 models or generate stress scenarios. Inputs require `positions`, `histories`,

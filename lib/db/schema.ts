@@ -11,6 +11,8 @@ import {
   boolean,
   doublePrecision,
   unique,
+  date,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -189,3 +191,101 @@ export const watchlistTicker = pgTable(
 );
 
 export type WatchlistTicker = InferSelectModel<typeof watchlistTicker>;
+
+export const portfolioSnapshot = pgTable(
+  'PortfolioSnapshot',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    portfolioId: uuid('portfolioId')
+      .notNull()
+      .references(() => portfolio.id, { onDelete: 'cascade' }),
+    source: varchar('source', { length: 40 }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull(),
+    adjustmentBasis: varchar('adjustmentBasis', {
+      enum: ['unadjusted', 'split-adjusted', 'total-return', 'unknown'],
+    }).notNull(),
+    observedAt: timestamp('observedAt', { withTimezone: true }).notNull(),
+    asOf: date('asOf').notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    portfolioCapturedIdx: index().on(
+      table.portfolioId,
+      table.createdAt,
+      table.id,
+    ),
+  }),
+);
+
+export type PortfolioSnapshot = InferSelectModel<typeof portfolioSnapshot>;
+
+export const portfolioSnapshotHolding = pgTable(
+  'PortfolioSnapshotHolding',
+  {
+    snapshotId: uuid('snapshotId')
+      .notNull()
+      .references(() => portfolioSnapshot.id, { onDelete: 'cascade' }),
+    ticker: varchar('ticker', { length: 20 }).notNull(),
+    shares: doublePrecision('shares').notNull(),
+    costBasis: doublePrecision('costBasis'),
+    price: doublePrecision('price').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.snapshotId, table.ticker] }),
+  }),
+);
+
+export type PortfolioSnapshotHolding = InferSelectModel<
+  typeof portfolioSnapshotHolding
+>;
+
+export const portfolioPriceHistory = pgTable(
+  'PortfolioPriceHistory',
+  {
+    id: uuid('id').primaryKey().notNull().defaultRandom(),
+    portfolioId: uuid('portfolioId')
+      .notNull()
+      .references(() => portfolio.id, { onDelete: 'cascade' }),
+    ticker: varchar('ticker', { length: 20 }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull(),
+    source: varchar('source', { length: 40 }).notNull(),
+    adjustmentBasis: varchar('adjustmentBasis', {
+      enum: ['unadjusted', 'split-adjusted', 'total-return', 'unknown'],
+    }).notNull(),
+    observedAt: timestamp('observedAt', { withTimezone: true }).notNull(),
+    asOf: date('asOf').notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    seriesUnique: unique().on(table.portfolioId, table.ticker, table.source),
+    portfolioTickerAsOfIdx: index().on(
+      table.portfolioId,
+      table.ticker,
+      table.asOf,
+    ),
+  }),
+);
+
+export type PortfolioPriceHistory = InferSelectModel<
+  typeof portfolioPriceHistory
+>;
+
+export const portfolioPricePoint = pgTable(
+  'PortfolioPricePoint',
+  {
+    historyId: uuid('historyId')
+      .notNull()
+      .references(() => portfolioPriceHistory.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    price: doublePrecision('price').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.historyId, table.date] }),
+  }),
+);
+
+export type PortfolioPricePoint = InferSelectModel<typeof portfolioPricePoint>;

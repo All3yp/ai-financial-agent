@@ -1,16 +1,25 @@
 import 'server-only';
 
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import { db } from './queries';
 import {
   portfolio,
   portfolioHolding,
+  portfolioPriceHistory,
+  portfolioPricePoint,
+  portfolioSnapshot,
+  portfolioSnapshotHolding,
   watchlist,
   watchlistTicker,
 } from './schema';
 import type {
+  HoldingSnapshotInput,
+  PortfolioCaptureRepository,
+  PortfolioPriceHistoryRecord,
   PortfolioRecord,
   PortfolioRepository,
+  PortfolioSnapshotRecord,
+  PriceHistoryInput,
   WatchlistRecord,
 } from '@/lib/portfolio/persistence';
 
@@ -69,7 +78,46 @@ async function getWatchlistRecord(
   return toWatchlistRecord(row, tickers);
 }
 
-export const portfolioRepository: PortfolioRepository = {
+function toSnapshotRecord(
+  row: typeof portfolioSnapshot.$inferSelect,
+  holdings: (typeof portfolioSnapshotHolding.$inferSelect)[],
+): PortfolioSnapshotRecord {
+  return {
+    id: row.id,
+    source: row.source as HoldingSnapshotInput['source'],
+    currency: row.currency,
+    adjustmentBasis:
+      row.adjustmentBasis as HoldingSnapshotInput['adjustmentBasis'],
+    observedAt: row.observedAt.toISOString(),
+    asOf: row.asOf,
+    capturedAt: row.createdAt.toISOString(),
+    holdings: holdings.map(({ ticker, shares, costBasis, price }) => ({
+      ticker,
+      shares,
+      costBasis,
+      price,
+    })),
+  };
+}
+
+function toPriceHistoryRecord(
+  row: typeof portfolioPriceHistory.$inferSelect,
+  prices: (typeof portfolioPricePoint.$inferSelect)[],
+): PortfolioPriceHistoryRecord {
+  return {
+    ticker: row.ticker,
+    currency: row.currency,
+    source: row.source as PriceHistoryInput['source'],
+    adjustmentBasis:
+      row.adjustmentBasis as PriceHistoryInput['adjustmentBasis'],
+    observedAt: row.observedAt.toISOString(),
+    asOf: row.asOf,
+    prices: prices.map(({ date, price }) => ({ date, price })),
+  };
+}
+
+export const portfolioRepository: PortfolioRepository &
+  PortfolioCaptureRepository = {
   async listPortfolios(userId) {
     const rows = await db
       .select()
@@ -333,6 +381,240 @@ export const portfolioRepository: PortfolioRepository = {
             );
         }
       }
+    });
+  },
+
+  async listSnapshots(userId, portfolioId, cursor) {
+    const [ownedPortfolio] = await db
+      .select({ id: portfolio.id })
+      .from(portfolio)
+      .where(and(eq(portfolio.id, portfolioId), eq(portfolio.userId, userId)));
+    if (!ownedPortfolio) return null;
+
+    const rows = await db
+      .select()
+      .from(portfolioSnapshot)
+      .where(
+        and(
+          eq(portfolioSnapshot.portfolioId, portfolioId),
+          cursor
+            ? or(
+                lt(portfolioSnapshot.createdAt, new Date(cursor.createdAt)),
+                and(
+                  eq(portfolioSnapshot.createdAt, new Date(cursor.createdAt)),
+                  lt(portfolioSnapshot.id, cursor.id),
+                ),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(portfolioSnapshot.createdAt), desc(portfolioSnapshot.id))
+      .limit(101);
+    const hasMore = rows.length > 100;
+    const pageRows = rows.slice(0, 100);
+    const holdingRows = pageRows.length
+      ? await db
+          .select()
+          .from(portfolioSnapshotHolding)
+          .where(
+            inArray(
+              portfolioSnapshotHolding.snapshotId,
+              pageRows.map(({ id }) => id),
+            ),
+          )
+          .orderBy(asc(portfolioSnapshotHolding.ticker))
+      : [];
+    const grouped = new Map<string, typeof holdingRows>();
+    for (const holding of holdingRows) {
+      const group = grouped.get(holding.snapshotId) ?? [];
+      group.push(holding);
+      grouped.set(holding.snapshotId, group);
+    }
+    const last = pageRows[pageRows.length - 1];
+    return {
+      records: pageRows.map((row) =>
+        toSnapshotRecord(row, grouped.get(row.id) ?? []),
+      ),
+      nextCursor:
+        hasMore && last
+          ? { createdAt: last.createdAt.toISOString(), id: last.id }
+          : null,
+    };
+  },
+
+  async createSnapshot(userId, portfolioId, input) {
+    return db.transaction(async (tx) => {
+      const [ownedPortfolio] = await tx
+        .select()
+        .from(portfolio)
+        .where(
+          and(eq(portfolio.id, portfolioId), eq(portfolio.userId, userId)),
+        );
+      if (!ownedPortfolio) return { kind: 'not-found' as const };
+      if (input.currency !== ownedPortfolio.currency)
+        return { kind: 'currency-mismatch' as const };
+
+      const currentHoldings = await tx
+        .select()
+        .from(portfolioHolding)
+        .where(eq(portfolioHolding.portfolioId, portfolioId));
+      const expectedTickers = currentHoldings
+        .map(({ ticker }) => ticker)
+        .sort();
+      const suppliedTickers = input.prices.map(({ ticker }) => ticker).sort();
+      if (
+        expectedTickers.length !== suppliedTickers.length ||
+        expectedTickers.some(
+          (ticker, index) => ticker !== suppliedTickers[index],
+        )
+      ) {
+        return { kind: 'holdings-mismatch' as const };
+      }
+
+      const [row] = await tx
+        .insert(portfolioSnapshot)
+        .values({
+          portfolioId,
+          source: input.source,
+          currency: input.currency,
+          adjustmentBasis: input.adjustmentBasis,
+          observedAt: new Date(input.observedAt),
+          asOf: input.asOf,
+        })
+        .returning();
+      const prices = new Map(
+        input.prices.map(({ ticker, price }) => [ticker, price]),
+      );
+      const capturedHoldings = currentHoldings.map((holding) => {
+        const price = prices.get(holding.ticker);
+        if (price === undefined) {
+          throw new Error('Snapshot price missing for portfolio holding');
+        }
+        return {
+          snapshotId: row.id,
+          ticker: holding.ticker,
+          shares: holding.shares,
+          costBasis: holding.costBasis,
+          price,
+        };
+      });
+      await tx.insert(portfolioSnapshotHolding).values(capturedHoldings);
+      return {
+        kind: 'created' as const,
+        record: toSnapshotRecord(row, capturedHoldings),
+      };
+    });
+  },
+
+  async listPriceHistories(userId, portfolioId) {
+    const [ownedPortfolio] = await db
+      .select({ id: portfolio.id })
+      .from(portfolio)
+      .where(and(eq(portfolio.id, portfolioId), eq(portfolio.userId, userId)));
+    if (!ownedPortfolio) return null;
+
+    const rows = await db
+      .select()
+      .from(portfolioPriceHistory)
+      .where(eq(portfolioPriceHistory.portfolioId, portfolioId))
+      .orderBy(
+        asc(portfolioPriceHistory.ticker),
+        desc(portfolioPriceHistory.asOf),
+      )
+      .limit(500);
+    const pointRows = rows.length
+      ? await db
+          .select()
+          .from(portfolioPricePoint)
+          .where(
+            inArray(
+              portfolioPricePoint.historyId,
+              rows.map(({ id }) => id),
+            ),
+          )
+          .orderBy(asc(portfolioPricePoint.date))
+      : [];
+    const grouped = new Map<string, typeof pointRows>();
+    for (const point of pointRows) {
+      const group = grouped.get(point.historyId) ?? [];
+      group.push(point);
+      grouped.set(point.historyId, group);
+    }
+    return rows.map((row) =>
+      toPriceHistoryRecord(row, grouped.get(row.id) ?? []),
+    );
+  },
+
+  async savePriceHistories(userId, portfolioId, input) {
+    return db.transaction(async (tx) => {
+      const [ownedPortfolio] = await tx
+        .select()
+        .from(portfolio)
+        .where(
+          and(eq(portfolio.id, portfolioId), eq(portfolio.userId, userId)),
+        );
+      if (!ownedPortfolio) return { kind: 'not-found' as const };
+      if (input.currency !== ownedPortfolio.currency)
+        return { kind: 'currency-mismatch' as const };
+
+      const currentHoldings = await tx
+        .select({ ticker: portfolioHolding.ticker })
+        .from(portfolioHolding)
+        .where(eq(portfolioHolding.portfolioId, portfolioId));
+      const heldTickers = new Set(currentHoldings.map(({ ticker }) => ticker));
+      if (input.histories.some(({ ticker }) => !heldTickers.has(ticker))) {
+        return { kind: 'unknown-ticker' as const };
+      }
+
+      const records: PortfolioPriceHistoryRecord[] = [];
+      for (const history of input.histories) {
+        const asOf = history.prices[history.prices.length - 1].date;
+        const [row] = await tx
+          .insert(portfolioPriceHistory)
+          .values({
+            portfolioId,
+            ticker: history.ticker,
+            currency: input.currency,
+            source: input.source,
+            adjustmentBasis: input.adjustmentBasis,
+            observedAt: new Date(input.observedAt),
+            asOf,
+          })
+          .onConflictDoUpdate({
+            target: [
+              portfolioPriceHistory.portfolioId,
+              portfolioPriceHistory.ticker,
+              portfolioPriceHistory.source,
+            ],
+            set: {
+              currency: input.currency,
+              adjustmentBasis: input.adjustmentBasis,
+              observedAt: new Date(input.observedAt),
+              asOf,
+            },
+          })
+          .returning();
+        await tx
+          .delete(portfolioPricePoint)
+          .where(eq(portfolioPricePoint.historyId, row.id));
+        await tx.insert(portfolioPricePoint).values(
+          history.prices.map(({ date, price }) => ({
+            historyId: row.id,
+            date,
+            price,
+          })),
+        );
+        records.push({
+          ticker: history.ticker,
+          currency: input.currency,
+          source: input.source,
+          adjustmentBasis: input.adjustmentBasis,
+          observedAt: new Date(input.observedAt).toISOString(),
+          asOf,
+          prices: history.prices,
+        });
+      }
+      return { kind: 'saved' as const, records };
     });
   },
 };

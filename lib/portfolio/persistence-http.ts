@@ -1,7 +1,12 @@
+import { z } from 'zod';
 import {
+  holdingSnapshotInputSchema,
+  isFreshPriceCapture,
+  priceHistoryInputSchema,
   portfolioBundleSchema,
   portfolioInputSchema,
   watchlistInputSchema,
+  type PortfolioCaptureRepository,
   type PortfolioExport,
   type PortfolioRepository,
 } from './persistence';
@@ -10,6 +15,12 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const headers = { 'Cache-Control': 'no-store' };
+const snapshotCursorSchema = z
+  .object({
+    createdAt: z.string().datetime(),
+    id: z.string().regex(UUID_PATTERN),
+  })
+  .strict();
 
 function jsonError(error: string, status: number): Response {
   return Response.json({ error }, { status, headers });
@@ -244,4 +255,124 @@ export async function watchlistItemResponse(
       : jsonError('Watchlist not found.', 404);
   }
   return jsonError('Method not allowed.', 405);
+}
+
+export async function portfolioSnapshotResponse(
+  request: Request,
+  userId: string,
+  portfolioId: string,
+  repository: PortfolioCaptureRepository,
+  now = new Date(),
+): Promise<Response> {
+  if (!UUID_PATTERN.test(portfolioId))
+    return jsonError('Portfolio not found.', 404);
+  if (request.method === 'GET') {
+    const encodedCursor = new URL(request.url).searchParams.get('cursor');
+    let cursor: { createdAt: string; id: string } | undefined;
+    if (encodedCursor !== null) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(encodedCursor, 'base64url').toString('utf8'),
+        ) as unknown;
+        const parsed = snapshotCursorSchema.safeParse(decoded);
+        if (!parsed.success) return jsonError('Invalid snapshot cursor.', 400);
+        cursor = parsed.data;
+      } catch {
+        return jsonError('Invalid snapshot cursor.', 400);
+      }
+    }
+    const result = await safely(() =>
+      repository.listSnapshots(userId, portfolioId, cursor),
+    );
+    if (result instanceof Response) return result;
+    return result
+      ? Response.json(
+          {
+            snapshots: result.records,
+            nextCursor: result.nextCursor
+              ? Buffer.from(JSON.stringify(result.nextCursor)).toString(
+                  'base64url',
+                )
+              : null,
+          },
+          { headers },
+        )
+      : jsonError('Portfolio not found.', 404);
+  }
+  if (request.method !== 'POST') return jsonError('Method not allowed.', 405);
+
+  const body = await readJson(request);
+  if ('response' in body) return body.response;
+  const parsed = holdingSnapshotInputSchema.safeParse(body.value);
+  if (!parsed.success) return jsonError('Invalid portfolio snapshot.', 400);
+  if (!isFreshPriceCapture(parsed.data.observedAt, parsed.data.asOf, now)) {
+    return jsonError('Portfolio snapshot is stale or future-dated.', 400);
+  }
+
+  const result = await safely(() =>
+    repository.createSnapshot(userId, portfolioId, parsed.data),
+  );
+  if (result instanceof Response) return result;
+  if (result.kind !== 'created') {
+    if (result.kind === 'not-found')
+      return jsonError('Portfolio not found.', 404);
+    if (result.kind === 'currency-mismatch')
+      return jsonError('Snapshot currency does not match the portfolio.', 409);
+    return jsonError(
+      'Snapshot tickers must exactly match current portfolio holdings.',
+      409,
+    );
+  }
+  return Response.json(result.record, { status: 201, headers });
+}
+
+export async function portfolioPriceHistoryResponse(
+  request: Request,
+  userId: string,
+  portfolioId: string,
+  repository: PortfolioCaptureRepository,
+  now = new Date(),
+): Promise<Response> {
+  if (!UUID_PATTERN.test(portfolioId))
+    return jsonError('Portfolio not found.', 404);
+  if (request.method === 'GET') {
+    const result = await safely(() =>
+      repository.listPriceHistories(userId, portfolioId),
+    );
+    if (result instanceof Response) return result;
+    return result
+      ? Response.json(result, { headers })
+      : jsonError('Portfolio not found.', 404);
+  }
+  if (request.method !== 'POST') return jsonError('Method not allowed.', 405);
+
+  const body = await readJson(request);
+  if ('response' in body) return body.response;
+  const parsed = priceHistoryInputSchema.safeParse(body.value);
+  if (!parsed.success) return jsonError('Invalid price history.', 400);
+  if (
+    parsed.data.histories.some(
+      ({ prices }) =>
+        !isFreshPriceCapture(
+          parsed.data.observedAt,
+          prices[prices.length - 1].date,
+          now,
+        ),
+    )
+  ) {
+    return jsonError('Price history is stale or future-dated.', 400);
+  }
+
+  const result = await safely(() =>
+    repository.savePriceHistories(userId, portfolioId, parsed.data),
+  );
+  if (result instanceof Response) return result;
+  if (result.kind !== 'saved') {
+    if (result.kind === 'not-found')
+      return jsonError('Portfolio not found.', 404);
+    if (result.kind === 'currency-mismatch')
+      return jsonError('History currency does not match the portfolio.', 409);
+    return jsonError('History tickers must belong to the portfolio.', 409);
+  }
+  return Response.json(result.records, { headers });
 }
