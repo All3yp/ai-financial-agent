@@ -60,6 +60,14 @@ interface PersistedAgentRun {
   steps?: Array<{ name: string; status: string; error: string | null }>;
 }
 
+interface ManagedPortfolio {
+  id: string;
+  name: string;
+  currency: string;
+  monitoringEnabled: boolean;
+  holdings: Array<{ ticker: string; shares: number; costBasis: number | null }>;
+}
+
 async function loadAgentRuns(): Promise<PersistedAgentRun[]> {
   const response = await fetch('/api/agents/runs?limit=50', {
     cache: 'no-store',
@@ -76,6 +84,14 @@ export function AgentDashboard() {
   const [persistedRuns, setPersistedRuns] = useState<PersistedAgentRun[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [managedPortfolios, setManagedPortfolios] = useState<
+    ManagedPortfolio[]
+  >([]);
+  const [monitoringError, setMonitoringError] = useState<string | null>(null);
+  const [monitoringLoading, setMonitoringLoading] = useState(false);
+  const [updatingPortfolioId, setUpdatingPortfolioId] = useState<string | null>(
+    null,
+  );
   const [agentStatuses, setAgentStatuses] = useState<AgentStatus[]>([
     {
       id: 'research-agent',
@@ -167,6 +183,72 @@ export function AgentDashboard() {
       window.clearInterval(interval);
     };
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'monitoring') return;
+    let active = true;
+    setMonitoringLoading(true);
+    void fetch('/api/portfolio/manage', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error('Portfolio settings are unavailable.');
+        return response.json();
+      })
+      .then((body) => {
+        if (active) {
+          setManagedPortfolios(body.portfolios);
+          setMonitoringError(null);
+        }
+      })
+      .catch((error) => {
+        if (active)
+          setMonitoringError(
+            error instanceof Error
+              ? error.message
+              : 'Portfolio settings are unavailable.',
+          );
+      })
+      .finally(() => {
+        if (active) setMonitoringLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeTab]);
+
+  const setPortfolioMonitoring = async (
+    portfolio: ManagedPortfolio,
+    enabled: boolean,
+  ) => {
+    setUpdatingPortfolioId(portfolio.id);
+    try {
+      const response = await fetch(`/api/portfolio/${portfolio.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: portfolio.name,
+          currency: portfolio.currency,
+          monitoringEnabled: enabled,
+          holdings: portfolio.holdings,
+        }),
+      });
+      if (!response.ok)
+        throw new Error('Could not update monitoring preference.');
+      const updated = await response.json();
+      setManagedPortfolios((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setMonitoringError(null);
+    } catch (error) {
+      setMonitoringError(
+        error instanceof Error
+          ? error.message
+          : 'Could not update monitoring preference.',
+      );
+    } finally {
+      setUpdatingPortfolioId(null);
+    }
+  };
 
   const triggerWorkflow = async (workflowType: string, data: any) => {
     setIsLoading(true);
@@ -607,12 +689,76 @@ export function AgentDashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-medium mb-2">Active Schedules</h4>
+                <h4 className="font-medium mb-2">Monitoring Consent</h4>
+                <p className="mb-3 text-sm text-muted-foreground">
+                  Scheduled checks use the fixed UTC weekday cadence shown
+                  below. No portfolio is monitored until you enable it.
+                </p>
+                {monitoringError ? (
+                  <p role="alert" className="mb-3 text-sm text-destructive">
+                    {monitoringError}
+                  </p>
+                ) : null}
+                {monitoringLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Loading portfolios...
+                  </p>
+                ) : null}
+                {!monitoringLoading &&
+                managedPortfolios.length === 0 &&
+                !monitoringError ? (
+                  <p className="text-sm text-muted-foreground">
+                    No portfolios available.
+                  </p>
+                ) : null}
+                <div className="divide-y">
+                  {managedPortfolios.map((portfolio) => (
+                    <label
+                      key={portfolio.id}
+                      className="flex items-center justify-between gap-4 py-3"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {portfolio.name}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {portfolio.holdings.length} holdings ·{' '}
+                          {portfolio.currency}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={portfolio.monitoringEnabled}
+                          disabled={
+                            updatingPortfolioId === portfolio.id ||
+                            portfolio.holdings.length === 0
+                          }
+                          onChange={(event) =>
+                            void setPortfolioMonitoring(
+                              portfolio,
+                              event.target.checked,
+                            )
+                          }
+                          aria-label={`Enable scheduled monitoring for ${portfolio.name}`}
+                        />
+                        {updatingPortfolioId === portfolio.id
+                          ? 'Saving...'
+                          : portfolio.monitoringEnabled
+                            ? 'Enabled'
+                            : 'Off'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-medium mb-2">Fixed UTC Schedule</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Portfolio Monitoring</span>
                     <Badge variant="default">
-                      Every hour (9AM-4PM, Mon-Fri)
+                      Hourly, 09:00-16:00 UTC, Mon-Fri
                     </Badge>
                   </div>
                   <div className="flex justify-between">
