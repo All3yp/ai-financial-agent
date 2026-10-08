@@ -127,6 +127,7 @@ export const portfolio = pgTable(
       .references(() => user.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
     currency: varchar('currency', { length: 3 }).notNull(),
+    monitoringEnabled: boolean('monitoringEnabled').notNull().default(false),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
   },

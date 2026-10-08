@@ -6,6 +6,7 @@ import type { GetStepTools } from 'inngest';
 import { agentMemory } from './base';
 import { initializeAgents } from './specialized';
 import { agentRunStore } from '@/lib/db/agent-runs';
+import { portfolioRepository } from '@/lib/db/portfolio';
 import { sanitizeRunError } from './run-store';
 
 type WorkflowStepRunner = GetStepTools<typeof inngest>;
@@ -68,19 +69,16 @@ export const cleanupExpiredAgentRuns = inngest.createFunction(
 );
 
 // ============================================
-// SCHEDULED MONITORING - Runs every hour during market hours
+// Fixed UTC weekday/hour baseline; this is not exchange-calendar aware.
 // ============================================
 
 export const scheduledMonitoring = inngest.createFunction(
   { id: 'scheduled-monitoring', name: 'Scheduled Portfolio Monitoring' },
-  { cron: '0 9-16 * * 1-5' }, // 9AM-4PM, Mon-Fri (market hours)
+  { cron: '0 9-16 * * 1-5' },
   async ({ event, step }) => {
-    // Get user portfolios from DB (placeholder - implement based on your schema)
-    const portfolios = await step.run('get-portfolios', async () => {
-      // TODO: Fetch from your database
-      // return await db.query.portfolios.findMany();
-      return []; // Placeholder
-    });
+    const portfolios = await step.run('get-enabled-portfolios', () =>
+      portfolioRepository.listEnabledPortfoliosForMonitoring(),
+    );
 
     if (portfolios.length === 0) {
       return { message: 'No portfolios to monitor' };
@@ -88,17 +86,21 @@ export const scheduledMonitoring = inngest.createFunction(
 
     // Run monitor agent for each portfolio
     const results = await Promise.all(
-      portfolios.map(async (portfolio: any) => {
-        return await step.run(`monitor-${portfolio.id}`, async () => {
+      portfolios.map(async (portfolio) => {
+        return await step.run(`monitor-${portfolio.portfolioId}`, async () => {
           const result = await agents.monitor.execute({
-            id: `monitor-${portfolio.id}-${Date.now()}`,
+            id: `monitor-${portfolio.portfolioId}-${Date.now()}`,
             agentId: 'monitor-agent',
             type: 'monitor',
             input: { positions: portfolio.positions },
             status: 'pending',
             createdAt: new Date(),
           });
-          return { portfolioId: portfolio.id, alerts: result.alerts };
+          return {
+            portfolioId: portfolio.portfolioId,
+            userId: portfolio.userId,
+            alerts: result.alerts,
+          };
         });
       }),
     );

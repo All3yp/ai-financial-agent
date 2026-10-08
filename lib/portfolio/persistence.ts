@@ -22,6 +22,7 @@ export const portfolioInputSchema = z
       .trim()
       .toUpperCase()
       .regex(/^[A-Z]{3}$/),
+    monitoringEnabled: z.boolean().default(false),
     holdings: z.array(holdingSchema).max(100),
   })
   .strict()
@@ -215,6 +216,17 @@ export type PortfolioExport = {
   watchlists: WatchlistInput[];
 };
 
+export type ScheduledMonitoringPortfolio = {
+  portfolioId: string;
+  userId: string;
+  currency: string;
+  positions: Array<{
+    ticker: string;
+    shares: number;
+    costBasis?: number;
+  }>;
+};
+
 export type HoldingSnapshotInput = z.infer<typeof holdingSnapshotInputSchema>;
 export type PriceHistoryInput = z.infer<typeof priceHistoryInputSchema>;
 
@@ -277,6 +289,7 @@ export interface PortfolioCaptureRepository {
 
 export interface PortfolioRepository {
   listPortfolios(userId: string): Promise<PortfolioRecord[]>;
+  listEnabledPortfoliosForMonitoring(): Promise<ScheduledMonitoringPortfolio[]>;
   getPortfolio(userId: string, id: string): Promise<PortfolioRecord | null>;
   createPortfolio(
     userId: string,

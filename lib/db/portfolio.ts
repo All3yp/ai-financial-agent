@@ -31,6 +31,7 @@ function toPortfolioRecord(
     id: row.id,
     name: row.name,
     currency: row.currency,
+    monitoringEnabled: row.monitoringEnabled,
     holdings: holdings.map(({ ticker, shares, costBasis }) => ({
       ticker,
       shares,
@@ -161,6 +162,7 @@ export const portfolioRepository: PortfolioRepository &
           userId,
           name: input.name,
           currency: input.currency,
+          monitoringEnabled: input.monitoringEnabled,
         })
         .returning();
       if (input.holdings.length) {
@@ -195,6 +197,7 @@ export const portfolioRepository: PortfolioRepository &
         .set({
           name: input.name,
           currency: input.currency,
+          monitoringEnabled: input.monitoringEnabled,
           updatedAt: new Date(),
         })
         .where(and(eq(portfolio.id, id), eq(portfolio.userId, userId)))
@@ -332,6 +335,49 @@ export const portfolioRepository: PortfolioRepository &
     return Boolean(deleted);
   },
 
+  async listEnabledPortfoliosForMonitoring() {
+    const rows = await db
+      .select({
+        id: portfolio.id,
+        userId: portfolio.userId,
+        currency: portfolio.currency,
+      })
+      .from(portfolio)
+      .where(eq(portfolio.monitoringEnabled, true));
+    if (rows.length === 0) return [];
+
+    const holdings = await db
+      .select()
+      .from(portfolioHolding)
+      .where(
+        inArray(
+          portfolioHolding.portfolioId,
+          rows.map(({ id }) => id),
+        ),
+      )
+      .orderBy(asc(portfolioHolding.ticker));
+    const grouped = new Map<string, typeof holdings>();
+    for (const holding of holdings) {
+      const group = grouped.get(holding.portfolioId) ?? [];
+      group.push(holding);
+      grouped.set(holding.portfolioId, group);
+    }
+    return rows
+      .map((row) => ({
+        portfolioId: row.id,
+        userId: row.userId,
+        currency: row.currency,
+        positions: (grouped.get(row.id) ?? []).map(
+          ({ ticker, shares, costBasis }) => ({
+            ticker,
+            shares,
+            costBasis: costBasis ?? undefined,
+          }),
+        ),
+      }))
+      .filter(({ positions }) => positions.length > 0);
+  },
+
   async importBundle(userId, bundle) {
     await db.transaction(async (tx) => {
       for (const input of bundle.portfolios) {
@@ -341,10 +387,15 @@ export const portfolioRepository: PortfolioRepository &
             userId,
             name: input.name,
             currency: input.currency,
+            monitoringEnabled: input.monitoringEnabled,
           })
           .onConflictDoUpdate({
             target: [portfolio.userId, portfolio.name],
-            set: { currency: input.currency, updatedAt: new Date() },
+            set: {
+              currency: input.currency,
+              monitoringEnabled: input.monitoringEnabled,
+              updatedAt: new Date(),
+            },
           })
           .returning();
         await tx

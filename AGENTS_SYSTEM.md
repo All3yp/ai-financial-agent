@@ -282,6 +282,15 @@ migrations.
   let users configure frequency, timezone and pause/resume, and account for
   market sessions, daylight-saving changes, holidays, stale data and provider
   quotas. Do not describe the current UTC weekday crons as exchange-hours aware.
+
+Portfolio CRUD includes `monitoringEnabled`, which defaults to `false`; the
+scheduled monitor now queries only opted-in owner-scoped portfolios with
+holdings. This setting is available through the authenticated portfolio API
+and import/export, but there is not yet a dashboard control. The cron remains
+the fixed `0 9-16 * * 1-5` UTC schedule; it does not honor per-user timezones,
+frequency, exchange sessions, daylight-saving transitions or holidays. Scheduled
+run history, stale-price gating and alert delivery remain unimplemented.
+
 - [ ] Add an opt-in notification outbox with deduplication, bounded retries,
   throttling, delivery status, quiet hours and revocation. Begin with concise
   summaries/critical alerts that omit holdings and secrets by default.

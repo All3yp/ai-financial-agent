@@ -35,6 +35,23 @@ class MemoryRepository implements PortfolioRepository {
       .map(({ record }) => record);
   }
 
+  async listEnabledPortfoliosForMonitoring() {
+    return [...this.portfolios.values()]
+      .filter(
+        ({ record }) => record.monitoringEnabled && record.holdings.length > 0,
+      )
+      .map(({ owner, record }) => ({
+        portfolioId: record.id,
+        userId: owner,
+        currency: record.currency,
+        positions: record.holdings.map(({ ticker, shares, costBasis }) => ({
+          ticker,
+          shares,
+          costBasis: costBasis ?? undefined,
+        })),
+      }));
+  }
+
   async getPortfolio(userId: string, id: string) {
     const entry = this.portfolios.get(id);
     return entry?.owner === userId ? entry.record : null;
@@ -151,6 +168,7 @@ function request(method: string, body?: unknown) {
 const portfolioInput: PortfolioInput = {
   name: 'Long term',
   currency: 'USD',
+  monitoringEnabled: false,
   holdings: [{ ticker: 'AAPL', shares: 3, costBasis: 180 }],
 };
 
@@ -272,6 +290,32 @@ test('watchlist CRUD is owner-scoped', async () => {
       )
     ).status,
     204,
+  );
+});
+
+test('scheduled monitoring candidates require explicit opt-in and nonempty holdings', async () => {
+  const repository = new MemoryRepository();
+  const disabled = await repository.createPortfolio('alice', portfolioInput);
+  assert.equal(disabled.monitoringEnabled, false);
+  await repository.createPortfolio('bob', {
+    ...portfolioInput,
+    name: 'Enabled',
+    monitoringEnabled: true,
+  });
+  await repository.createPortfolio('bob', {
+    ...portfolioInput,
+    name: 'Empty',
+    monitoringEnabled: true,
+    holdings: [],
+  });
+
+  const candidates = await repository.listEnabledPortfoliosForMonitoring();
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].userId, 'bob');
+  assert.notEqual(candidates[0].portfolioId, disabled.id);
+  assert.deepEqual(
+    candidates[0].positions.map(({ ticker }) => ticker),
+    ['AAPL'],
   );
 });
 
