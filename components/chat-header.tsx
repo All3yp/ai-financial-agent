@@ -11,6 +11,7 @@ import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { VisibilityType, VisibilitySelector } from './visibility-selector';
+import { ProviderSelector } from './provider-selector';
 
 function PureChatHeader({
   chatId,
@@ -52,9 +53,13 @@ function PureChatHeader({
       )}
 
       {!isReadonly && (
+        <ProviderSelector className="order-1 md:order-2" />
+      )}
+
+      {!isReadonly && (
         <ModelSelector
           selectedModelId={selectedModelId}
-          className="order-1 md:order-2"
+          className="order-1 md:order-3"
         />
       )}
 
@@ -62,7 +67,7 @@ function PureChatHeader({
         <VisibilitySelector
           chatId={chatId}
           selectedVisibilityType={selectedVisibilityType}
-          className="order-1 md:order-3"
+          className="order-1 md:order-4"
         />
       )}
     </header>

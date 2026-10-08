@@ -6,6 +6,7 @@ export interface Model {
   apiIdentifier: string;
   description: string;
   isCustom?: boolean;
+  providerId?: string; // Optional: associate model with a specific provider
 }
 
 export const models: Array<Model> = [
@@ -14,24 +15,28 @@ export const models: Array<Model> = [
     label: 'GPT 4.1 nano',
     apiIdentifier: 'gpt-4.1-nano-2025-04-14',
     description: 'Fastest, most cost-effective GPT-4.1 model',
+    providerId: 'default',
   },
   {
     id: 'gpt-4.1-mini-2025-04-14',
     label: 'GPT 4.1 mini',
     apiIdentifier: 'gpt-4.1-mini-2025-04-14',
     description: 'Balance between intelligence, speed, and cost',
+    providerId: 'default',
   },
   {
     id: 'gpt-4.1-2025-04-14',
     label: 'GPT 4.1',
     apiIdentifier: 'gpt-4.1-2025-04-14',
     description: 'Flagship model for complex tasks',
+    providerId: 'default',
   },
   {
     id: 'gpt-4o',
     label: 'GPT-4o',
     apiIdentifier: 'gpt-4o',
     description: 'Omni-purpose model for complex tasks',
+    providerId: 'default',
   },
 ] as const;
 
@@ -68,7 +73,17 @@ export const removeCustomModel = (modelId: string) => {
   setCustomModels(customModels.filter(m => m.id !== modelId));
 };
 
-export const getAllModels = (): Model[] => {
+export const getAllModels = (providerId?: string): Model[] => {
   const customModels = getCustomModels();
-  return [...models, ...customModels];
+  const allModels = [...models, ...customModels];
+  
+  if (providerId) {
+    return allModels.filter(m => !m.providerId || m.providerId === providerId);
+  }
+  
+  return allModels;
+};
+
+export const getModelsForProvider = (providerId: string): Model[] => {
+  return getAllModels(providerId);
 };

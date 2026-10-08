@@ -2,13 +2,20 @@
 
 import type { Attachment, ChatRequestOptions, Message } from 'ai';
 import { useChat } from 'ai/react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher, track } from '@/lib/utils';
-import { getFinancialDatasetsApiKey, getLocalOpenAIApiKey, getLocalOpenAIBaseURL, getLocalOpenAIProviderName } from '@/lib/db/api-keys';
+import { 
+  getFinancialDatasetsApiKey, 
+  getProviders, 
+  getDefaultProviderId,
+  getProviderById,
+  getLocalOpenAIApiKey,
+  ModelProviderConfig 
+} from '@/lib/db/api-keys';
 
 import { Block } from './block';
 import { MultimodalInput } from './multimodal-input';
@@ -32,10 +39,12 @@ export function Chat({
 }) {
   const { mutate } = useSWRConfig();
   const financialDatasetsApiKey = getFinancialDatasetsApiKey();
-  const openAIApiKey = getLocalOpenAIApiKey();
-  const openAIBaseURL = getLocalOpenAIBaseURL();
-  const openAIProviderName = getLocalOpenAIProviderName();
   const [showApiKeysModal, setShowApiKeysModal] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(getDefaultProviderId());
+
+  // Get all providers and selected provider config
+  const providers = useMemo(() => getProviders(), [selectedProviderId]);
+  const selectedProvider = useMemo(() => getProviderById(selectedProviderId), [selectedProviderId]);
 
   const {
     messages,
@@ -52,9 +61,9 @@ export function Chat({
     body: { 
       id, 
       modelId: selectedModelId,
-      modelApiKey: openAIApiKey,
-      modelBaseURL: openAIBaseURL,
-      modelProviderName: openAIProviderName,
+      modelApiKey: selectedProvider?.apiKey || '',
+      modelBaseURL: selectedProvider?.baseURL,
+      modelProviderName: selectedProvider?.name,
       financialDatasetsApiKey,
     },
     initialMessages,

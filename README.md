@@ -34,6 +34,12 @@ By using this software, you agree to use it solely for learning purposes.
   - Data is optimized for AI financial agents
   - 30+ years of financial data with 100% market coverage
   - Documentation available [here](https://docs.financialdatasets.ai)
+- **Multi-Provider Support** 🔄
+  - Configure multiple OpenAI-compatible providers (OpenAI, Together.ai, Groq, OpenRouter, etc.)
+  - Switch between providers instantly in the chat header
+  - Each provider has its own API key, base URL, and model selection
+  - Add custom models for each provider
+  - Manage all providers through the API Keys modal
 
 ## Setup
 
@@ -80,6 +86,27 @@ LANGCHAIN_API_KEY=your-langsmith-api-key
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_PROJECT=ai-financial-agent
 ```
+
+### Multi-Provider Configuration (Optional)
+
+You can configure multiple OpenAI-compatible providers through the UI:
+
+1. **Open the API Keys modal** (click the key icon in the chat header)
+2. **Click "Add Provider"** to add a new provider
+3. **Enter provider details**:
+   - **Name**: Display name (e.g., "Together.ai", "Groq", "OpenRouter")
+   - **API Key**: Your provider's API key
+   - **Base URL**: The provider's OpenAI-compatible endpoint (e.g., `https://api.together.xyz/v1`)
+4. **Switch providers** using the provider selector in the chat header
+5. **Add custom models** for each provider in the same modal
+
+**Popular OpenAI-compatible providers:**
+- **Together.ai**: `https://api.together.xyz/v1` - Llama, Mixtral, Qwen models
+- **Groq**: `https://api.groq.com/openai/v1` - Fast inference for Llama, Mixtral
+- **OpenRouter**: `https://openrouter.ai/api/v1` - Access to 100+ models
+- **Fireworks AI**: `https://api.fireworks.ai/inference/v1` - Various open models
+- **Anyscale**: `https://api.endpoints.anyscale.com/v1` - Ray Serve models
+- **Local (LM Studio/Ollama)**: `http://localhost:1234/v1` - Run models locally
 
 **Important**: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
 
