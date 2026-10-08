@@ -47,6 +47,7 @@ export async function configureLocalEnvironment({
     FMP_API_KEY: environment.FMP_API_KEY || '',
     ALPHA_VANTAGE_API_KEY: environment.ALPHA_VANTAGE_API_KEY || '',
     TWELVE_DATA_API_KEY: environment.TWELVE_DATA_API_KEY || '',
+    FRED_API_KEY: environment.FRED_API_KEY || '',
     SEC_USER_AGENT: userAgent,
     LANGCHAIN_API_KEY: environment.LANGCHAIN_API_KEY || '',
     LANGCHAIN_TRACING_V2: 'true',

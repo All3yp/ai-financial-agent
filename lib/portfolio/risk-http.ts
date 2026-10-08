@@ -30,7 +30,7 @@ export function parsePortfolioReportJson(text: string) {
   }
 }
 
-async function readBoundedBody(request: Request): Promise<string> {
+export async function readBoundedBody(request: Request): Promise<string> {
   if (!request.body) return '';
   const reader = request.body.getReader();
   const decoder = new TextDecoder('utf-8', { fatal: true });

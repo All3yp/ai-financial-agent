@@ -10,6 +10,8 @@ test('market and portfolio calculations are registered and validate direct calls
   await assert.rejects(tools.generatePortfolioReport.execute({} as never));
   assert.equal(typeof tools.getSECFinancialFacts.execute, 'function');
   assert.equal(typeof tools.getSECFilingSections.execute, 'function');
+  assert.equal(typeof tools.getYieldCurve.execute, 'function');
+  assert.equal(typeof tools.getInflationData.execute, 'function');
 });
 
 test('SEC discovery is available through the manager without financial provider keys', async () => {

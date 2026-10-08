@@ -8,11 +8,17 @@ import { secFactsInputSchema } from '@/lib/api/sec-xbrl';
 import { secSectionsInputSchema } from '@/lib/api/sec-sections';
 import { portfolioTools } from './portfolio-tools';
 import { analyzeMarket, marketAnalysisInputSchema } from '@/lib/market/analysis';
+import { FREDClient, yieldCurveInputSchema, inflationInputSchema } from '@/lib/api/macro-data';
+import { optimizePortfolio, portfolioOptimizationInputSchema } from '@/lib/portfolio/optimize';
+import { analyzePortfolioFactors, portfolioFactorsInputSchema } from '@/lib/portfolio/factors';
 
 export const financialTools = [
   'getStockPrices', 'getIncomeStatements', 'getBalanceSheets',
   'getCashFlowStatements', 'getFinancialMetrics', 'searchStocksByFilters', 'getNews', 'getSECFilings',
   'getSECFinancialFacts', 'getSECFilingSections', 'generatePortfolioReport', 'analyzeMarket',
+  'getYieldCurve', 'getInflationData',
+  'optimizePortfolio',
+  'analyzePortfolioFactors',
 ] as const;
 
 export type AllowedTools = (typeof financialTools)[number];
@@ -21,6 +27,7 @@ export interface FinancialToolsConfig {
   financialDatasetsApiKey?: string;
   financialData?: FinancialDataConfig;
   secUserAgent?: string;
+  fredApiKey?: string;
   dataStream?: { writeData: (data: JSONValue) => void } | null;
   fetcher?: typeof fetch;
 }
@@ -38,6 +45,7 @@ const statements = z.object({
 export class FinancialToolsManager {
   private client: FinancialDataClient;
   private secClient?: SECClient;
+  private fredClient?: FREDClient;
 
   constructor(private config: FinancialToolsConfig) {
     this.client = new FinancialDataClient(
@@ -64,6 +72,32 @@ export class FinancialToolsManager {
 
   public getTools() {
     return {
+      analyzePortfolioFactors: {
+        description: 'Compute actual covariance PCA and optional regression against caller-supplied real factor histories. Requires real identically aligned adjusted price histories; factor regression requires complete long-only portfolioWeights summing to one. Portfolio regression models DAILY REBALANCED weights, not fixed shares. Eigen loadings are statistical, not causal factors or recommendations. Preserve rank-deficiency errors, units, dates, warnings and limitations. Never invent histories or factor values.',
+        parameters: portfolioFactorsInputSchema,
+        execute: async (params: z.input<typeof portfolioFactorsInputSchema>) => analyzePortfolioFactors(params),
+      },
+      optimizePortfolio: {
+        description: 'Compute local long-only fully-invested historical portfolio weights using minimum-variance, risk-parity or genuine HRP. Requires real sourced positive consistently adjusted histories with identical dates, at least 21 observations. Returns convergence, covariance assumptions and limitations, not investment recommendations. Weight caps are supported for minimum variance only; other capped methods reject unsupported constraints. No expected-return forecast, transaction costs or automatic trades.',
+        parameters: portfolioOptimizationInputSchema,
+        execute: async (params: z.input<typeof portfolioOptimizationInputSchema>) => optimizePortfolio(params),
+      },
+      getYieldCurve: {
+        description: 'Get official FRED 2-year, 10-year and 3-month Treasury yields and 2s10s/3m10y spreads. Requires FRED_API_KEY for the intended user. Provide startDate, endDate and asOf vintage explicitly; yields are percentages and spreads percentage points. Missing data is not filled. Not CME FedWatch or future rate expectations.',
+        parameters: yieldCurveInputSchema,
+        execute: (params: z.input<typeof yieldCurveInputSchema>) => {
+          this.fredClient ??= new FREDClient(this.config.fredApiKey ?? process.env.FRED_API_KEY ?? '', this.config.fetcher);
+          return this.fredClient.getYieldCurve(params);
+        },
+      },
+      getInflationData: {
+        description: 'Get official FRED CPI, core CPI, PCE, core PCE or PPI all-commodities year-over-year percentage changes. Provide selected series IDs, startDate, endDate and asOf vintage. Requires intended-user FRED_API_KEY. Missing observations are null; publication lags and revisions matter. Not release forecasts or an economic calendar.',
+        parameters: inflationInputSchema,
+        execute: (params: z.input<typeof inflationInputSchema>) => {
+          this.fredClient ??= new FREDClient(this.config.fredApiKey ?? process.env.FRED_API_KEY ?? '', this.config.fetcher);
+          return this.fredClient.getInflationData(params);
+        },
+      },
       ...portfolioTools,
       generatePortfolioReport: {
         ...portfolioTools.generatePortfolioReport,

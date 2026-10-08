@@ -157,7 +157,9 @@ the shared `FinancialDataClient`, used by chat and agent financial tools.
 - ❌ Institutional holdings (13F)
 - ❌ Options flow / Greeks
 - ❌ Short interest data
-- ❌ Macro data (Fed, inflation, yield curve)
+- Official FRED yield-curve and inflation tools are implemented; live use requires
+  the intended user's registered FRED API key. CME expectations and release
+  calendars remain unavailable.
 - ❌ Crypto/forex/commodities
 - ❌ Alternative data (satellite, credit card, web traffic)
 - ❌ News sentiment analysis (NLP)
@@ -268,10 +270,22 @@ supported. Filing text remains untrusted data, never agent instructions.
 ### Phase 2: Macro & Market Structure (High Priority)
 
 - [ ] **Macro Data**
-  - [ ] `getYieldCurve()` - 2s10s, 3m10y spreads
+  - [x] `getYieldCurve({ startDate, endDate, asOf })` - official FRED yields and 2s10s/3m10y spreads
   - [ ] `getFedRateExpectations()` - CME FedWatch
-  - [ ] `getInflationData()` - CPI, PCE, PPI, core
+  - [x] `getInflationData({ startDate, endDate, asOf, series })` - FRED CPI/core CPI/PCE/core PCE/PPI all commodities YoY
   - [ ] `getEconomicCalendar()` - upcoming releases
+
+FRED tools use `lib/api/macro-data.ts` and require `FRED_API_KEY` or the chat
+request's `fredApiKey`. Use the intended user's registered key according to FRED
+terms; the application does not create or share keys automatically. Both tools
+require an explicit vintage `asOf`, setting `realtime_start` and `realtime_end`
+to that date. Observation periods must end no later than the vintage. Yields
+cover up to 366 inclusive days; inflation covers up to ten calendar years and
+uses FRED's `pc1` transformation (year-over-year percent, not annualized MoM).
+Yields are percentages; spreads are percentage points from common non-null
+dates only. Missing values remain null with no forward-fill. Truncated or
+invalid responses fail explicitly; errors redact upstream keys and URLs.
+Five-minute bounded client-local caching does not replace shared rate limiting.
 
 - [ ] **Market Breadth & Internals**
   - [ ] `getSectorPerformance()` - XLF, XLK, XLE, etc.
@@ -303,6 +317,7 @@ supported. Filing text remains untrusted data, never agent instructions.
 
 - [ ] **MacroAgent** - Fed, inflation, yield curve → sector allocation
 - [ ] **RiskAgent** - VaR, stress testing, factor decomposition
+- [x] Deterministic **RiskAgent** - historical risk report and explicit shocks (factor decomposition remains pending)
 - [ ] **EarningsAgent** - Pre/post earnings, transcript analysis
 - [ ] **InsiderAgent** - Form 4 tracking, cluster buying/selling
 - [ ] **OptionsAgent** - Flow, IV surface, gamma exposure, max pain
@@ -336,9 +351,34 @@ Provenance, FX conversion and corporate-action adjustment are caller obligations
 
 - [ ] `calculatePortfolioRisk(positions[])` - VaR, CVaR, factor exposure
 - [ ] `optimizePortfolio(constraints)` - Mean-variance, risk parity, HRP
+- [x] Local long-only minimum-variance, equal-risk-contribution and genuine HRP optimization (`optimizePortfolio` tool)
+- [ ] Expected-return mean-variance objectives, turnover/cost/liquidity constraints and historical validation
 - [ ] `stressTestPortfolio(scenarios)` - 2008, 2020, rate shock, inflation
 - [ ] `calculateCorrelationMatrix(tickers)` - Factor models (PCA)
+- [x] Actual covariance PCA and optional explicit-factor regression (`analyzePortfolioFactors` tool)
 - [ ] `generatePortfolioReport(positions[])` - Attribution, risk decomposition
+
+`lib/portfolio/optimize.ts` uses `ml-matrix` for sample covariance and matrix
+operations. It requires identical real price dates (21 to 501) for at most ten
+assets. All methods are long-only and fully invested. Minimum variance uses
+projected-gradient optimization with an explicitly enforced feasible weight cap;
+equal-risk contribution uses positive coordinate descent; HRP uses actual
+correlation distance, deterministic single-linkage clustering, quasi-diagonal
+ordering and recursive cluster-variance allocation. Nontrivial weight caps on
+risk parity/HRP are rejected, not silently approximated. Shrinkage/ridge,
+convergence criteria and iteration bounds are explicit; exhausted iterative
+solvers fail rather than report success. No expected-return forecast, taxes,
+fees, turnover, liquidity model or execution is included.
+
+`lib/portfolio/factors.ts` uses symmetric eigendecomposition for covariance PCA
+and SVD for optional regression against 1 to 5 explicit factor-price histories.
+Inputs require 2 to 10 assets with identical dated histories. PCA retains sorted
+eigenvalues, explained variance and deterministic signed loadings. Regression
+requires complete long-only weights summing to one and reports beta, daily
+intercept, residual volatility and R-squared; rank-deficient regressors fail.
+Regression models DAILY REBALANCED weights, not fixed-share positions, and is
+not merged into the fixed-share risk report as though the two models matched.
+Neither PCA nor regression implies causal or realized performance attribution.
 
 ### Phase 7: Multi-Agent Market Analysis (Core Request)
 
@@ -354,13 +394,25 @@ common observation dates and warns when gaps or stale common dates affect the
 result. This is a tested numerical foundation available to existing agents, not
 the complete autonomous agent team, allocation optimizer or scheduling system.
 
-- [ ] **MarketRegimeAgent** - Identifies regime (bull/bear/sideways/volatile)
-- [ ] **SectorRotationAgent** - Tracks sector momentum, rotation signals
+- [x] **MarketRegimeAgent** - descriptive regime and volatility from real caller histories
+- [x] **SectorRotationAgent** - common-date sector-proxy momentum rankings, not predictive signals
 - [ ] **AssetAllocationAgent** - Strategic/tactical allocation by risk profile
-- [ ] **TimeHorizonAgent** - Short/medium/long term specialists
+- [x] **TimeHorizonAgent** - configurable historical momentum horizons with differing evidence preserved
 - [ ] **ConservativeModeAgent** - FIIs, dividend aristocrats, bonds, low vol
 - [ ] **AggressiveModeAgent** - Momentum, growth, small caps, crypto
 - [ ] **TeamOrchestrator** - Coordinates specialists, resolves conflicts, produces consensus
+- [x] **QuantitativeTeamOrchestrator** - validated parallel quantitative specialists and evidence-based synthesis
+
+`lib/agents/quantitative.ts` provides deterministic agents that use existing
+task lifecycle and memory. They perform no model/network calls and do not
+register themselves globally. The quantitative team preserves opposing
+historical horizons and relative sector lagging rather than hiding conflicts
+behind a fabricated consensus. Inputs are `{ market, portfolio? }` using the
+strict market/risk schemas above. `POST /api/agents/quantitative` requires a
+signed-in user and enforces a streamed 1 MiB input limit. Results include full
+specialist outputs, effective dates, conflicts, warnings and limitations.
+This is not the complete team: allocation, optimization, conservative/aggressive
+modes, FIIs, live sourced-history acquisition and schedules remain pending.
 
 ### Phase 8: Execution Modes Beyond Chat
 
@@ -369,6 +421,7 @@ the complete autonomous agent team, allocation optimizer or scheduling system.
 - [ ] **Webhook Alerts** - Push to Discord/Slack/Email/Telegram
 - [ ] **API Endpoints** - REST/GraphQL for external integration
 - [ ] **CLI Tool** - `pnpm agent:analyze AAPL --mode=conservative`
+- [x] Quantitative team CLI: `pnpm agent:analyze --input input.json --mode=quantitative`
 - [ ] **Background Workers** - Continuous monitoring, auto-rebalancing signals
 - [ ] **Dashboard Widgets** - Real-time regime, allocation, risk metrics
 
@@ -381,6 +434,14 @@ the complete autonomous agent team, allocation optimizer or scheduling system.
 - [ ] **Inngest Cloud** - Production deployment (Vercel integration)
 - [ ] **LangSmith/Helicone** - Tracing, evals, cost tracking
 - [ ] **Eval Framework** - Golden datasets, regression testing
+- [x] Repeatable local fixture regression, typecheck and application-build commands (`pnpm test`, `pnpm typecheck`, `pnpm build:app`)
+
+The quantitative CLI reads a bounded 1 MiB UTF-8 JSON file containing
+`{ market, portfolio? }`. It does not download prices or call a model and rejects
+conservative/aggressive modes and ticker-only quick-look inputs explicitly.
+Output is structured JSON; diagnostics never echo paths or input contents.
+Fixture tests are a regression baseline, not a completed live-agent evaluation
+framework, backtest or financial model validation on licensed market datasets.
 
 ---
 
@@ -448,6 +509,7 @@ FINANCIAL_DATASETS_API_KEY=your_financial_datasets_key
 # FMP_API_KEY=your_fmp_key
 # ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
 # TWELVE_DATA_API_KEY=your_twelve_data_key
+# FRED_API_KEY=your_registered_user_key
 # Without an explicit selection, a configured Financial Datasets key takes priority.
 # SEC_USER_AGENT is generated by local setup from your existing identity or contact.
 # SEC_CONTACT_EMAIL=your-real-contact@your-domain.com  # unattended setup input
@@ -498,6 +560,9 @@ components/
 ### Automated Checks
 
 ```bash
+pnpm test
+pnpm typecheck
+pnpm build:app
 node --test scripts/setup-env.test.mjs
 bash -n setup-local.sh
 pnpm exec tsx --test lib/api/*.test.ts lib/ai/tools/*.test.ts lib/agents/research.test.ts lib/portfolio/*.test.ts lib/market/*.test.ts scripts/portfolio-report.test.ts
@@ -509,6 +574,24 @@ These checks use fixtures and do not prove live-provider entitlements, freshness
 SEC connectivity, deployment readiness or end-to-end model execution.
 `next build` checks the application without changing the database; the existing
 `pnpm build` also runs database migrations and must use the intended database.
+
+### Current External Blockers
+
+- SEC contact is intentionally left mocked at the user's request. The separate
+  `.env.sec.example` is not loaded automatically and is not a usable SEC identity.
+  Fixtures remain mocked; real SEC calls require a real contact configured in
+  `.env`. Setup prompting was cancelled without changing existing credentials.
+- No FRED key or production Inngest event/signing keys are configured locally.
+  Implementations can be fixture-tested, but live FRED and production schedules
+  cannot be verified in this state.
+- Paid/entitled transcripts, ownership/short-interest sources, options flow,
+  alternative data and FII/on-chain/futures data need authorized source contracts.
+  No paid account or guessed credentials are created automatically.
+- Webhook destinations, production storage/cache/vector credentials and deployment
+  configuration are not provided. Infrastructure placeholders are not deployed.
+- Remaining local work is still backlog, not an external blocker: extended
+  optimization constraints, causal attribution, strategy/allocation agents, dashboard widgets, persistent
+  portfolio ingestion and a full evaluation framework are not complete.
 
 1. **Test current system**: `pnpm dev` + `npx inngest-cli dev` → `/agents`
 2. **Run Full Analysis** on AAPL with peers MSFT, GOOGL

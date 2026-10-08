@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     modelFallback,
     financialDatasetsApiKey,
     financialData,
+    fredApiKey,
     modelApiKey,
     modelBaseURL,
     modelProviderName,
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
     modelFallback?: ModelFallbackConfig;
     financialDatasetsApiKey?: string;
     financialData?: FinancialDataConfig;
+    fredApiKey?: string;
     modelApiKey?: string;
     modelBaseURL?: string;
     modelProviderName?: string;
@@ -80,6 +82,10 @@ export async function POST(request: Request) {
 
   if (!modelApiKey) {
     return new Response('Model API key is required', { status: 400 });
+  }
+
+  if (fredApiKey !== undefined && !z.string().trim().regex(/^[a-z0-9]{32}$/).safeParse(fredApiKey).success) {
+    return new Response('Invalid FRED API key format', { status: 400 });
   }
 
   const parsedFinancialData = financialDataConfigSchema.optional().safeParse(financialData);
@@ -163,6 +169,7 @@ export async function POST(request: Request) {
       const financialToolsManager = new FinancialToolsManager({
         financialDatasetsApiKey,
         financialData: resolvedFinancialData,
+        fredApiKey,
         dataStream,
       });
       dataStream.writeData({
