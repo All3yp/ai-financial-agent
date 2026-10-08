@@ -2,10 +2,59 @@
 // Handles scheduled tasks, workflows, and async agent communication
 
 import { inngest } from './client';
+import type { GetStepTools } from 'inngest';
 import { agentMemory } from './base';
 import { initializeAgents } from './specialized';
 import { agentRunStore } from '@/lib/db/agent-runs';
 import { sanitizeRunError } from './run-store';
+
+type WorkflowStepRunner = GetStepTools<typeof inngest>;
+
+async function startPersistedRun(runId: string, step: WorkflowStepRunner) {
+  await step.run('persist-run-start', () =>
+    agentRunStore.markRunRunning(runId),
+  );
+}
+
+async function persistedStep<T>(
+  runId: string,
+  step: WorkflowStepRunner,
+  name: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  await step.run(`persist-${name}-start`, () =>
+    agentRunStore.markStepRunning(runId, name),
+  );
+  try {
+    const result = await step.run(name, operation);
+    await step.run(`persist-${name}-result`, () =>
+      agentRunStore.completeStep(runId, name, result),
+    );
+    return result as T;
+  } catch (error) {
+    await step.run(`persist-${name}-failure`, () =>
+      agentRunStore.failRun(runId, sanitizeRunError(error)),
+    );
+    throw error;
+  }
+}
+
+async function completePersistedRun(
+  runId: string,
+  step: WorkflowStepRunner,
+  result: unknown,
+) {
+  try {
+    await step.run('persist-run-result', () =>
+      agentRunStore.completeRun(runId, result),
+    );
+  } catch (error) {
+    await step.run('persist-run-failure', () =>
+      agentRunStore.failRun(runId, sanitizeRunError(error)),
+    );
+    throw error;
+  }
+}
 
 // Initialize agents with API key from environment
 const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY || '';
@@ -195,10 +244,13 @@ export const runMonitoringWorkflow = inngest.createFunction(
   { id: 'run-monitoring-workflow', name: 'Run Portfolio Monitoring' },
   { event: 'agent/monitoring.requested' },
   async ({ event, step }) => {
-    const { positions } = event.data;
-    const result = await step.run('monitor', () =>
+    const { positions, runId } = event.data;
+    if (typeof runId !== 'string')
+      throw new Error('Monitoring run ID is missing');
+    await startPersistedRun(runId, step);
+    const result = await persistedStep(runId, step, 'monitor', () =>
       agents.monitor.execute({
-        id: `monitor-${Date.now()}`,
+        id: runId,
         agentId: 'monitor-agent',
         type: 'monitor',
         input: { positions },
@@ -206,6 +258,7 @@ export const runMonitoringWorkflow = inngest.createFunction(
         createdAt: new Date(),
       }),
     );
+    await completePersistedRun(runId, step, result);
     return result;
   },
 );
@@ -236,23 +289,31 @@ export const runAnalysisWorkflow = inngest.createFunction(
   { id: 'run-analysis-workflow', name: 'Run Full Analysis Workflow' },
   { event: 'agent/analysis.requested' },
   async ({ event, step }) => {
-    const { ticker, peers = [], userId } = event.data;
+    const { ticker, peers = [], runId } = event.data;
+    if (typeof runId !== 'string')
+      throw new Error('Analysis run ID is missing');
+    await startPersistedRun(runId, step);
 
     // Step 1: Research Agent gathers data
-    const researchData = await step.run('research', async () => {
-      return await agents.research.execute({
-        id: `research-${ticker}-${Date.now()}`,
-        agentId: 'research-agent',
-        type: 'research',
-        input: { ticker, period: 'quarterly', limit: 20 },
-        status: 'pending',
-        createdAt: new Date(),
-      });
-    });
+    const researchData = await persistedStep(
+      runId,
+      step,
+      'research',
+      async () => {
+        return await agents.research.execute({
+          id: `research-${ticker}-${Date.now()}`,
+          agentId: 'research-agent',
+          type: 'research',
+          input: { ticker, period: 'quarterly', limit: 20 },
+          status: 'pending',
+          createdAt: new Date(),
+        });
+      },
+    );
 
     // Step 2: Analysis Agent analyzes (can run in parallel with peer research)
     const [analysis, peerResearch] = await Promise.all([
-      step.run('analysis', async () => {
+      persistedStep(runId, step, 'analysis', async () => {
         return await agents.analysis.execute({
           id: `analysis-${ticker}-${Date.now()}`,
           agentId: 'analysis-agent',
@@ -262,7 +323,7 @@ export const runAnalysisWorkflow = inngest.createFunction(
           createdAt: new Date(),
         });
       }),
-      step.run('peer-research', async () => {
+      persistedStep(runId, step, 'peer-research', async () => {
         if (peers.length === 0) return {};
         const peerData = await Promise.all(
           peers.map((p: string) =>
@@ -283,7 +344,7 @@ export const runAnalysisWorkflow = inngest.createFunction(
     ]);
 
     // Step 3: Report Agent generates report
-    const report = await step.run('report', async () => {
+    const report = await persistedStep(runId, step, 'report', async () => {
       return await agents.report.execute({
         id: `report-${ticker}-${Date.now()}`,
         agentId: 'report-agent',
@@ -306,7 +367,13 @@ export const runAnalysisWorkflow = inngest.createFunction(
       });
     });
 
-    return { ticker, report: report.report, analysis: analysis.recommendation };
+    const output = {
+      ticker,
+      report: report.report,
+      analysis: analysis.recommendation,
+    };
+    await completePersistedRun(runId, step, output);
+    return output;
   },
 );
 
@@ -318,24 +385,30 @@ export const runDebateWorkflow = inngest.createFunction(
   { id: 'run-debate-workflow', name: 'Multi-Agent Investment Debate' },
   { event: 'agent/debate.requested' },
   async ({ event, step }) => {
-    const { ticker, question, userId } = event.data;
-    const correlationId = `debate-${ticker}-${Date.now()}`;
+    const { ticker, question, runId } = event.data;
+    if (typeof runId !== 'string') throw new Error('Debate run ID is missing');
+    await startPersistedRun(runId, step);
 
     // Step 1: Research agent gets data
-    const researchData = await step.run('research', async () => {
-      return await agents.research.execute({
-        id: `research-${ticker}-${Date.now()}`,
-        agentId: 'research-agent',
-        type: 'research',
-        input: { ticker, period: 'quarterly', limit: 20 },
-        status: 'pending',
-        createdAt: new Date(),
-      });
-    });
+    const researchData = await persistedStep(
+      runId,
+      step,
+      'research',
+      async () => {
+        return await agents.research.execute({
+          id: `research-${ticker}-${Date.now()}`,
+          agentId: 'research-agent',
+          type: 'research',
+          input: { ticker, period: 'quarterly', limit: 20 },
+          status: 'pending',
+          createdAt: new Date(),
+        });
+      },
+    );
 
     // Step 2: Two analysis agents with different perspectives
     const [bullCase, bearCase] = await Promise.all([
-      step.run('bull-case', async () => {
+      persistedStep(runId, step, 'bull-case', async () => {
         const bullAgent = new (await import('./specialized')).AnalysisAgent(
           FINANCIAL_DATASETS_API_KEY,
         );
@@ -354,7 +427,7 @@ export const runDebateWorkflow = inngest.createFunction(
           createdAt: new Date(),
         });
       }),
-      step.run('bear-case', async () => {
+      persistedStep(runId, step, 'bear-case', async () => {
         const bearAgent = new (await import('./specialized')).AnalysisAgent(
           FINANCIAL_DATASETS_API_KEY,
         );
@@ -375,22 +448,26 @@ export const runDebateWorkflow = inngest.createFunction(
     ]);
 
     // Step 3: Synthesis agent creates balanced view
-    const synthesis = await step.run('synthesis', async () => {
-      const { streamText } = await import('ai');
-      const { customModel } = await import('../ai');
-      const { getAllModels } = await import('../ai/models');
+    const synthesis = await persistedStep(
+      runId,
+      step,
+      'synthesis',
+      async () => {
+        const { streamText } = await import('ai');
+        const { customModel } = await import('../ai');
+        const { getAllModels } = await import('../ai/models');
 
-      const model = getAllModels().find(
-        (m) => m.id === 'thinkingmachines/inkling:free',
-      );
-      if (!model) throw new Error('Synthesis model is not configured');
-      const modelInstance = customModel(model.apiIdentifier, {
-        apiKey: process.env.OPENAI_API_KEY || '',
-        baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-        name: process.env.OPENAI_PROVIDER_NAME || 'openai',
-      });
+        const model = getAllModels().find(
+          (m) => m.id === 'thinkingmachines/inkling:free',
+        );
+        if (!model) throw new Error('Synthesis model is not configured');
+        const modelInstance = customModel(model.apiIdentifier, {
+          apiKey: process.env.OPENAI_API_KEY || '',
+          baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+          name: process.env.OPENAI_PROVIDER_NAME || 'openai',
+        });
 
-      const prompt = `Synthesize a balanced investment view from these two perspectives:
+        const prompt = `Synthesize a balanced investment view from these two perspectives:
 
 QUESTION: ${question}
 TICKER: ${ticker}
@@ -410,24 +487,25 @@ Provide:
 3. Probability-weighted scenarios
 4. Final recommendation with confidence`;
 
-      const result = await streamText({
-        model: modelInstance,
-        system:
-          'You are a Senior Investment Committee Member. Synthesize opposing views into a balanced, nuanced investment decision.',
-        messages: [{ role: 'user', content: prompt }],
-        maxSteps: 1,
-      });
+        const result = await streamText({
+          model: modelInstance,
+          system:
+            'You are a Senior Investment Committee Member. Synthesize opposing views into a balanced, nuanced investment decision.',
+          messages: [{ role: 'user', content: prompt }],
+          maxSteps: 1,
+        });
 
-      let fullText = '';
-      for await (const chunk of result.textStream) {
-        fullText += chunk;
-      }
+        let fullText = '';
+        for await (const chunk of result.textStream) {
+          fullText += chunk;
+        }
 
-      return { synthesis: fullText, bullCase, bearCase, researchData };
-    });
+        return { synthesis: fullText, bullCase, bearCase, researchData };
+      },
+    );
 
     // Step 4: Generate report
-    const report = await step.run('report', async () => {
+    const report = await persistedStep(runId, step, 'report', async () => {
       return await agents.report.execute({
         id: `report-${ticker}-${Date.now()}`,
         agentId: 'report-agent',
@@ -447,7 +525,13 @@ Provide:
       console.log(`Debate complete for ${ticker}`);
     });
 
-    return { ticker, report: report.report, synthesis: synthesis.synthesis };
+    const output = {
+      ticker,
+      report: report.report,
+      synthesis: synthesis.synthesis,
+    };
+    await completePersistedRun(runId, step, output);
+    return output;
   },
 );
 

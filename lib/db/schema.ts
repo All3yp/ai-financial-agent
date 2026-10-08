@@ -300,6 +300,7 @@ export const agentRun = pgTable(
     workflowType: varchar('workflowType', {
       enum: ['analysis', 'debate', 'screening', 'monitoring'],
     }).notNull(),
+    idempotencyKey: varchar('idempotencyKey', { length: 128 }).notNull(),
     status: varchar('status', {
       enum: ['pending', 'running', 'completed', 'failed'],
     })
@@ -318,6 +319,7 @@ export const agentRun = pgTable(
   (table) => ({
     ownerCreatedIdx: index().on(table.userId, table.createdAt, table.id),
     expiryIdx: index().on(table.expiresAt),
+    ownerIdempotencyUnique: unique().on(table.userId, table.idempotencyKey),
   }),
 );
 

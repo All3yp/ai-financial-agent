@@ -1,20 +1,34 @@
 import 'server-only';
 
-import { and, asc, desc, eq, gt, inArray, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 import { db } from './queries';
 import { agentRun, agentRunStep } from './schema';
 import type {
+  AgentWorkflowType,
   AgentRunRecord,
   AgentRunStepRecord,
   AgentRunStore,
+  CreateAgentRunResult,
 } from '@/lib/agents/run-store';
 
 const RUN_RETENTION_DAYS = 90;
+const MAX_ACTIVE_RUNS_PER_USER = 3;
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
 
 function toRunRecord(row: typeof agentRun.$inferSelect): AgentRunRecord {
   return {
     id: row.id,
-    workflowType: row.workflowType as 'screening',
+    workflowType: row.workflowType as AgentWorkflowType,
     status: row.status as AgentRunRecord['status'],
     input: row.input as AgentRunRecord['input'],
     result: row.result,
@@ -40,21 +54,62 @@ function toStepRecord(
 }
 
 export const agentRunStore: AgentRunStore = {
-  async createScreeningRun(userId, criteria) {
+  async createRun(
+    userId,
+    workflowType,
+    input,
+    idempotencyKey,
+  ): Promise<CreateAgentRunResult> {
     const now = new Date();
     const expiresAt = new Date(
       now.getTime() + RUN_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     );
-    const [row] = await db
-      .insert(agentRun)
-      .values({
-        userId,
-        workflowType: 'screening',
-        input: { criteria },
-        expiresAt,
-      })
-      .returning();
-    return toRunRecord(row);
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+      await tx
+        .delete(agentRun)
+        .where(and(eq(agentRun.userId, userId), lte(agentRun.expiresAt, now)));
+      const [existing] = await tx
+        .select()
+        .from(agentRun)
+        .where(
+          and(
+            eq(agentRun.userId, userId),
+            eq(agentRun.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        if (
+          existing.workflowType !== workflowType ||
+          stableJson(existing.input) !== stableJson(input)
+        ) {
+          return { kind: 'conflict' as const };
+        }
+        return { kind: 'existing' as const, run: toRunRecord(existing) };
+      }
+
+      const activeRuns = await tx
+        .select({ id: agentRun.id })
+        .from(agentRun)
+        .where(
+          and(
+            eq(agentRun.userId, userId),
+            inArray(agentRun.status, ['pending', 'running']),
+            gt(agentRun.expiresAt, now),
+          ),
+        )
+        .limit(MAX_ACTIVE_RUNS_PER_USER);
+      if (activeRuns.length >= MAX_ACTIVE_RUNS_PER_USER) {
+        return { kind: 'limit' as const };
+      }
+
+      const [row] = await tx
+        .insert(agentRun)
+        .values({ userId, workflowType, idempotencyKey, input, expiresAt })
+        .returning();
+      return { kind: 'created' as const, run: toRunRecord(row) };
+    });
   },
 
   async markRunRunning(runId) {

@@ -14,8 +14,8 @@ export const inngest = new Inngest({
 });
 
 // Helper to send events to Inngest
-export async function sendEvent(name: string, data: any) {
-  await inngest.send({ name, data });
+export async function sendEvent(name: string, data: any, eventId?: string) {
+  await inngest.send({ name, data, id: eventId });
 }
 
 // Event names for type safety
@@ -32,16 +32,36 @@ export async function requestAnalysis(
   ticker: string,
   peers?: string[],
   userId?: string,
+  runId?: string,
 ) {
-  await sendEvent(AgentEvents.ANALYSIS_REQUESTED, { ticker, peers, userId });
+  await sendEvent(
+    AgentEvents.ANALYSIS_REQUESTED,
+    {
+      ticker,
+      peers,
+      userId,
+      runId,
+    },
+    runId,
+  );
 }
 
 export async function requestDebate(
   ticker: string,
   question: string,
   userId?: string,
+  runId?: string,
 ) {
-  await sendEvent(AgentEvents.DEBATE_REQUESTED, { ticker, question, userId });
+  await sendEvent(
+    AgentEvents.DEBATE_REQUESTED,
+    {
+      ticker,
+      question,
+      userId,
+      runId,
+    },
+    runId,
+  );
 }
 
 export async function requestScreening(
@@ -49,11 +69,27 @@ export async function requestScreening(
   userId?: string,
   runId?: string,
 ) {
-  await sendEvent(AgentEvents.SCREENING_REQUESTED, { criteria, userId, runId });
+  await sendEvent(
+    AgentEvents.SCREENING_REQUESTED,
+    { criteria, userId, runId },
+    runId,
+  );
 }
 
-export async function requestMonitoring(positions: any[], userId?: string) {
-  await sendEvent(AgentEvents.MONITORING_REQUESTED, { positions, userId });
+export async function requestMonitoring(
+  positions: any[],
+  userId?: string,
+  runId?: string,
+) {
+  await sendEvent(
+    AgentEvents.MONITORING_REQUESTED,
+    {
+      positions,
+      userId,
+      runId,
+    },
+    runId,
+  );
 }
 
 export async function requestReport(type: string, data: any, userId?: string) {

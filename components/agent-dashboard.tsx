@@ -188,13 +188,16 @@ export function AgentDashboard() {
 
       const response = await fetch('/api/agents/trigger', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
         body: JSON.stringify({ workflowType, data }),
       });
 
       const result = await response.json();
       const accepted = response.ok && result.success;
-      const queued = workflowType === 'screening' && response.status === 202;
+      const queued = response.status === 202;
 
       setWorkflowResults((prev) =>
         prev.map((w) =>

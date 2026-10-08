@@ -210,12 +210,11 @@ Before implementing these items, resolve their concrete prerequisites:
 ### Phase 0: Persistent And Reliable Autonomous Operation (Top Priority)
 
 These prerequisites come before promising unattended monitoring or remote
-notifications. Owner-scoped portfolio and watchlist tables now exist, but
-holding snapshots and caller-submitted price histories are persisted. On-demand
-screening runs now have durable records; other workflow runs, schedules, reports
-and notifications are not yet persisted. Inngest is wired, but some scheduled
-steps are placeholders and other trigger paths can still execute the same
-request synchronously and as a background event.
+notifications. Owner-scoped portfolio and watchlist tables, holding snapshots,
+caller-submitted price histories and manually triggered workflow runs now have
+durable records. Scheduled runs, configurable schedules, notifications and
+separate report/screening-result entities are not yet persisted. Some scheduled
+Inngest steps remain placeholders.
 
 - [x] Add owner-scoped portfolio/watchlist persistence: schema, migrations,
   validated CRUD, import/export, and tests for cross-user isolation.
@@ -257,24 +256,28 @@ separate and never create or refresh these records.
 - [ ] Persist all job runs, statuses, step results, errors, reports and screening
   results; connect dashboard History/status to those records and define retention.
 
-The first durable-run slice currently covers on-demand screening only. It
-creates an owner-scoped `AgentRun` before enqueueing, passes that run ID through
-the Inngest event, persists `pending`/`running`/`completed`/`failed` status and
-the `screen` step output, and exposes authenticated owner-filtered history and
-detail at `/api/agents/runs` and `/api/agents/runs/[id]`. The `/agents` History
-tab reads these records and polls status while open. Screening submission is
-queued-only and returns HTTP 202; it no longer also performs the same work
-synchronously. A daily 03:00 UTC Inngest job deletes records after their
-90-day retention window, cascading to step results. Other workflow types still
-use their existing behavior and do not yet have durable runs; screening criteria
-are retained as input, but separate report and screening-result entities,
-concurrency limits, idempotency controls and full trigger-contract cleanup
-remain open. Deployments must register the Inngest functions and apply database
-migrations for this lifecycle to run.
+Manual analysis, debate, screening and monitoring triggers create an owner-scoped
+`AgentRun` before enqueueing and pass that run ID through Inngest. Statuses,
+workflow-step results, final outputs and sanitized failures are persisted.
+Authenticated owner-filtered history and detail are available at
+`/api/agents/runs` and `/api/agents/runs/[id]`; the `/agents` History tab polls
+status while open. All four manual workflows are queued-only and return HTTP
+202, so the trigger no longer duplicates work synchronously. Submit
+`Idempotency-Key` as a UUID header; repeated requests with the same owner, key,
+workflow and input return the original run without enqueueing again, while key
+reuse for different input returns 409. The key is also the Inngest event ID.
+The database serializes run creation per owner and allows at most three active
+manual runs per user; additional submissions receive 429 with `Retry-After`.
+Runs expire after 90 days and a daily 03:00 UTC Inngest job deletes expired
+records with cascading step cleanup. Scheduled workflows are still outside this
+lifecycle. Deployments must register the Inngest functions and apply database
+migrations.
 
-- [ ] Choose one trigger contract: queued/background with run ID and status
-  polling, or synchronous only. Remove accidental double execution, and add
-  idempotency keys, bounded concurrency, per-user limits and failure visibility.
+- [x] Choose queued/background execution with run ID and status polling for
+  manual agent triggers; remove their duplicate synchronous execution.
+- [x] Add idempotency keys, bounded manual-run concurrency and per-user limits.
+- [ ] Extend durable status/failure handling and execution limits to scheduled
+  workflows.
 - [ ] Make scheduled monitoring query only enabled, owner-authorized portfolios;
   let users configure frequency, timezone and pause/resume, and account for
   market sessions, daylight-saving changes, holidays, stale data and provider
