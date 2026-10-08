@@ -142,14 +142,179 @@ A Markdown checklist is guidance, not CI enforcement. A model score cannot waive
 
 Report checks as `passed`, `failed`, `not_run` or `unknown`. Never fabricate execution, citations, probabilities, provider access, cost or production readiness.
 
+## 12. RTK — Terminal Output Discipline
+
+Use RTK for terminal commands when the installed version provides a suitable wrapper with equivalent execution semantics. This rule applies to shell/CLI execution, not native file/search tools, MCP calls, API requests or numerical runtime functions.
+
+### Availability And Routing
+
+- At the first relevant terminal operation, verify `rtk --version` and inspect only the help needed for the intended wrapper. Cache the result for the session; do not repeat setup checks for every command.
+- If a verified hook already rewrites commands, use that integration and avoid double wrapping. Never assume global configuration covers every editor, remote environment or subagent.
+- Otherwise invoke the verified RTK equivalent explicitly. Never blindly prepend `rtk` to arbitrary scripts or compound shell expressions.
+- Typical supported forms include `rtk git status`, `rtk git diff`, `rtk git log -n 5`, `rtk test pnpm test`, and `rtk err pnpm typecheck`. Verify local support and inspect package scripts before running tests/builds.
+- Use native scoped file/search tools when they provide the exact evidence needed. Do not force an extra terminal call solely to increase RTK usage.
+
+### Evidence Recovery And Exceptions
+
+Compact output is an inspection aid, not a substitute for complete evidence. Preserve exit status, failed checks, relevant warnings and source locations. If output is filtered, do not infer absence of errors or complete test coverage from a short summary.
+
+When omitted detail affects correctness, inspect RTK's recovery output if available (`rtk recall` in supported versions) or read the relevant saved log. Prefer recovering existing output over rerunning commands, especially commands with side effects.
+
+Use `rtk proxy <command>` for raw passthrough when supported and necessary. Use direct execution if RTK is unavailable, unsupported, changes required semantics or cannot expose needed evidence. State a brief meaningful exception once; do not add boilerplate before every command.
+
+Do not filter stdout that is being consumed as machine-readable JSON, source content, patches, exact snapshots or another program's input. Use raw execution for byte-sensitive operations. RTK compression is lossy and is not a sanitizer or authorization layer.
+
+Preserve argument boundaries, quoting, environment, working directory and shell semantics. Do not assume filtered wrappers expand glob patterns, pipes or shell operators. Inspect supported explicit-shell behavior only when required.
+
+### Setup, Metrics And Privacy
+
+Do not install RTK, edit hooks, run init or change telemetry automatically. Propose setup separately and preserve existing configuration; verify flags against installed help.
+Use `rtk gain` only when requested or useful to a bounded evaluation, not after every command. Its estimated output reduction is not actual provider-billed token or monetary savings.
+No RTK wrapper grants permission for commits, pushes, migrations or other restricted operations.
+
+## 13. Caveman — Concise Communication, Complete Engineering
+
+Apply Caveman-style low-noise communication to chat progress, handoffs and final reports. Preserve analytical rigor and technical detail where needed. Compress narration, not implementation, acceptance criteria, evidence or maintained documentation.
+
+### Skill Discovery And Activation
+
+- If an approved Caveman skill is installed and discoverable, use its actual metadata/name and supported activation mechanism. Do not assume a slash command, plugin or skill exists just because it is mentioned here.
+- Reuse one installed skill; do not copy its entire body into these instructions or into every agent.
+- Load only the relevant skill and workflow instructions. Do not open all skills, examples, resource files or upstream documentation on every task.
+- Skill bodies enter context when activated; activation has overhead and is not automatically a net token saving. Do not reread or reinvoke a communication skill at every step.
+- If unavailable, follow the concise rules below without claiming the skill was loaded. Continue work; do not install packages, create skill folders or configure a proxy without approval.
+- A skill for response style should apply inline. Do not spawn a subagent merely to rewrite a message tersely. Do not assume parent activation propagates to every subagent; provide the same concise-output requirement in the handoff when needed.
+
+### Communication Rules
+
+Answer or report the outcome first. Prefer short active sentences and compact bullets. Remove greetings, filler, repeated plans, narration of routine tool calls, duplicated recaps and generic offers to continue.
+
+For multi-step work, provide a short meaningful phase update only when needed. Report blockers immediately. In a final response, use only applicable fields: outcome; changed files; checks/results; blockers/limitations; next required action. Omit empty sections.
+
+Preserve negation, uncertainty, conditions, severity, dates, numbers, units, identifiers, paths, commands, error text and evidence references. Never drop `not`, `never`, `only` or an important qualifier to shorten a sentence. Do not use broken grammar or change the requested language.
+
+Do not impose a fixed word budget that hides complexity. Expand for explanations explicitly requested, financial/numerical assumptions, safety warnings, consent, irreversible actions or ambiguity. Accuracy and user intent override terseness.
+
+Code remains clean, complete and conventionally formatted. Do not minify code, shorten meaningful names, delete necessary comments, compress schemas or weaken tests. Technical specifications and maintained documentation remain readable and sufficiently detailed; they are not written in caveman fragments.
+
+### Optional Caveman Workflow Skills
+
+When installed and relevant, inspect the actual skill descriptions before choosing an investigate-first, lean-build, surgical-patch, safe-refactor, migration or verify-and-stop workflow. These are optional upstream workflows, not required tools or permission to broaden scope. Load the smallest relevant set; existing repository policy and owner authorization take precedence.
+
+Do not run memory-file compression, skill conversion, proxy setup or optimization commands merely to save tokens. They change artifacts or configuration and require review/authorization. No skill may silently rewrite repository instructions or user prompts.
+
+## 14. Combined Efficiency And Skill Loading
+
+RTK reduces terminal-output noise; Caveman communication reduces unnecessary prose. Use one appropriate compressor per surface. Do not pipe RTK output through Caveman shrink by default or add redundant summarization/delegation passes.
+
+Caveman's optional proxy/middleware is a separate integration, not activated by a skill or by this file. Do not assume it supports the current Copilot environment. If proposed, review compatibility, evidence recovery, telemetry, configuration changes and overlap with RTK before adoption.
+
+Skill discovery provides metadata; full instructions/resources should load only when relevant. Avoid duplicate skill names/locations and copying full skill instructions into permanently loaded policies. A long inventory also has overhead; install only useful approved capabilities.
+
+Evaluate efficiency by successful task completion, input/output usage where measured, tool calls, retries and rework. Do not infer request-billed savings from shorter answers. Never claim a percentage saving without a measured baseline and clear accounting.
+
+Protect clean code, complete documentation and verified evidence first. If compression causes ambiguity or repeated retrieval, prefer clearer/full relevant context.
+
 ## Final Diff Checklist
 
-- Does every changed file serve the requested outcome?
-- Is the behavior based on verified repository contracts?
-- Are invalid/missing states explicit?
-- Are trust boundaries and ownership enforced?
+Apply the core checks to every change. Apply conditional checks only when
+the affected surface is relevant.
+
+Record material blockers and verification gaps. Do not produce a verbose
+checklist report for every small task. Use `not_applicable` when appropriate;
+do not invent evidence to complete a checkbox.
+
+### Scope And Maintainability
+
+- Does every changed file directly serve the requested outcome and acceptance criteria?
+- Is this the smallest complete change, without unrelated refactors, upgrades or formatting churn?
+- Were existing implementations inspected before adding another solution?
+- Does each new file, dependency, abstraction or agent have a concrete current responsibility?
+- Are functions, components and modules cohesive rather than oversized or fragmented into trivial wrappers?
+- Are names, types and control flow understandable without unnecessary explanation?
+- Were dead code, debug output, commented-out code, unused exports and obsolete comments removed from the changed areas?
+- Does the diff avoid speculative features, generic frameworks and duplicated business rules?
+
+### Correctness And Contracts
+
+- Is the behavior based on verified repository contracts and actual callers?
+- Are invalid, missing, partial and unsupported states explicit?
+- Are defaults intentional, rather than silently hiding missing data or failed operations?
+- Are errors preserved and handled at the appropriate boundary?
+- Are existing callers and supported behavior preserved, or are intentional breaking changes identified?
+- Does disabled or unavailable optional functionality preserve the expected baseline behavior?
+
+### Security And Data Integrity
+
+- Are trust boundaries, server-side authorization and owner isolation enforced?
+- Are secrets and sensitive data excluded from code, logs, errors, fixtures and external requests?
+- Are user-controlled inputs bounded and validated before reaching files, databases, tools or providers?
 - Are deterministic calculations outside model judgment?
-- Are retries, loops and external calls bounded?
-- Did tests cover the changed behavior and important failure modes?
+- Are provenance, dates, units, currency, alignment and numerical assumptions preserved where relevant?
+
+### Tests And Verification
+
+- Do tests cover the changed behavior and important failure modes?
+- Would the relevant tests fail if the implementation were broken?
+- Are assertions meaningful, with justified numerical tolerances where needed?
+- Were unrelated tests, assertions or safeguards left intact rather than weakened to obtain a pass?
+- Are offline tests independent of paid calls, production credentials and uncontrolled network access?
+- Were the actual diff and applicable validation results inspected after the final edits?
+- Are failed, skipped and unverified checks reported accurately?
+
+### Documentation And Repository Hygiene
+
 - Did documentation change only in authoritative locations?
-- Are skipped checks and remaining unknowns explicit?
+- Are examples, commands, paths and configuration consistent with the actual implementation?
+- Were obsolete claims corrected instead of contradicted by appended text?
+- Are links updated after file moves or removals?
+- Does the diff avoid duplicate guides, completion reports, task indexes and unnecessary permanent documents?
+- Are temporary files, local logs, credentials and unrelated generated artifacts excluded?
+- Are task statuses supported by verified acceptance criteria?
+
+### Conditional: Dependencies And Integration
+
+- Is each new or changed dependency necessary, compatible and the intended package?
+- Are dependency manifests and lockfiles consistent, without unrelated churn?
+- Are optional workflows and integrations justified by a current requirement?
+- Are configuration, credentials, data rights and operational prerequisites explicit?
+- Are unavailable integrations clearly distinguished from functioning implementations?
+
+### Conditional: Async Work And External Calls
+
+- Are retries, loops, concurrency and external calls bounded?
+- Are timeout, cancellation, rate limits and partial failure handled explicitly?
+- Are idempotency and replay behavior verified for side-effecting or durable work?
+- Can retries or concurrent execution duplicate actions, overwrite newer state or cross owner boundaries?
+- Does cancellation prevent additional work from being scheduled?
+
+### Conditional: Operational And Schema Changes
+
+- Are migrations, deployment steps and configuration changes necessary and authorized?
+- Is compatibility with existing data and running application versions understood?
+- Is an appropriate rollback, disablement, forward-fix or recovery path identified?
+- Are irreversible actions and rollback limitations explicit?
+- Were operational checks separated from ordinary local validation?
+
+### Conditional: UI Changes
+
+- Are loading, empty, error, partial and disabled states understandable?
+- Are keyboard interaction, focus, labels and relevant accessibility behavior checked?
+- Does the change avoid unnecessary client-side work or exposing server-only information?
+- Is the existing UI pattern reused without a broad unrelated redesign?
+
+### Tool And Token Efficiency
+
+- Was RTK used for suitable terminal operations, without double wrapping or lost evidence?
+- Were exact or machine-readable outputs kept unfiltered when required?
+- Were Caveman and other skills loaded only when relevant, without duplicating their instructions?
+- Did concise communication preserve complete code, documentation, qualifiers and validation evidence?
+- Did optimization avoid extra calls, repeated inspections or rework that negate its benefit?
+
+### Completion Decision
+
+- Are all applicable acceptance criteria satisfied?
+- Are validated blockers resolved or explicitly left open?
+- Are remaining unknowns, limitations and required owner decisions clear?
+- Is the final status accurate: complete, partially complete or blocked?
+- Are optional polish suggestions distinguished from correctness or security blockers?
