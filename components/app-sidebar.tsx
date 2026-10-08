@@ -69,7 +69,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               onClick={() => setOpenMobile(false)}
               className="flex items-center gap-3 px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-lg transition-colors"
             >
-              <BrainIcon className="w-5 h-5" />
+              <BrainIcon className="size-5" />
               <span>Agents</span>
             </Link>
           </div>

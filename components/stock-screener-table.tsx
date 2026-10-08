@@ -151,7 +151,7 @@ export function StockScreenerTable({
                       >
                         <div className="flex items-center gap-1 justify-between">
                           {formatLabel(metric)}
-                          <ArrowUpDown className="h-4 w-4" />
+                          <ArrowUpDown className="size-4" />
                         </div>
                       </TableHead>
                     ))}

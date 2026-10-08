@@ -22,6 +22,7 @@ export interface Model {
   // Whether model is expiring soon
   expiringSoon?: boolean;
   expiryDate?: string;
+  endpointType?: 'chat' | 'decision';
 }
 
 // ============================================
@@ -345,9 +346,16 @@ export const getModelsByCategory = (category: Model['category']): Model[] => {
 };
 
 // Get non-embedding/audio models (for chat/completion)
-export const getChatModels = (): Model[] => {
-  return openRouterFreeModels.filter(m => m.category !== 'embedding' && m.category !== 'audio');
-};
+export const isChatModel = (model: Model): boolean =>
+  model.endpointType !== 'decision' &&
+  model.category !== 'embedding' &&
+  model.category !== 'audio';
+
+export const filterChatModels = (models: Model[]): Model[] =>
+  models.filter(isChatModel);
+
+export const getChatModels = (): Model[] =>
+  filterChatModels(openRouterFreeModels);
 
 // Get non-expiring models
 export const getNonExpiringModels = (): Model[] => {

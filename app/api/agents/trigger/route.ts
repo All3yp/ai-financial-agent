@@ -3,6 +3,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
+import { parseEvidenceGapDecisionMode } from '@/lib/ai/decisions/evidence-gap';
 import {
   requestAnalysis,
   requestDebate,
@@ -33,6 +34,7 @@ async function enqueueWorkflow(
         input.question as string,
         userId,
         runId,
+        parseEvidenceGapDecisionMode(),
       );
     case 'screening':
       return requestScreening(

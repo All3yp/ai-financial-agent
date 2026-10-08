@@ -9,6 +9,10 @@ import { agentRunStore } from '@/lib/db/agent-runs';
 import { portfolioRepository } from '@/lib/db/portfolio';
 import { dueMonitoringOccurrence } from '@/lib/portfolio/schedule';
 import { sanitizeRunError } from './run-store';
+import {
+  parseEvidenceGapDecisionMode,
+} from '@/lib/ai/decisions/evidence-gap';
+import { runDebateEvidenceGapGate } from './debate-evidence-gap';
 
 type WorkflowStepRunner = GetStepTools<typeof inngest>;
 
@@ -459,6 +463,9 @@ export const runDebateWorkflow = inngest.createFunction(
   async ({ event, step }) => {
     const { ticker, question, runId } = event.data;
     if (typeof runId !== 'string') throw new Error('Debate run ID is missing');
+    const decisionMode = parseEvidenceGapDecisionMode(
+      event.data.decisionMode ?? 'off',
+    );
     await startPersistedRun(runId, step);
 
     // Step 1: Research agent gets data
@@ -477,6 +484,21 @@ export const runDebateWorkflow = inngest.createFunction(
         });
       },
     );
+
+    if (decisionMode === 'deterministic') {
+      const gate = await runDebateEvidenceGapGate({
+        mode: decisionMode,
+        objective: question,
+        research: researchData,
+        persistStep: (name, operation) =>
+          persistedStep(runId, step, name, operation),
+      });
+      if (gate.kind === 'stop') {
+        const output = { ticker, status: 'unresolved', decision: gate.decision };
+        await completePersistedRun(runId, step, output);
+        return output;
+      }
+    }
 
     // Step 2: Two analysis agents with different perspectives
     const [bullCase, bearCase] = await Promise.all([
@@ -527,9 +549,9 @@ export const runDebateWorkflow = inngest.createFunction(
       async () => {
         const { streamText } = await import('ai');
         const { customModel } = await import('../ai');
-        const { getAllModels } = await import('../ai/models');
+        const { getChatModels } = await import('../ai/models');
 
-        const model = getAllModels().find(
+        const model = getChatModels().find(
           (m) => m.id === 'thinkingmachines/inkling:free',
         );
         if (!model) throw new Error('Synthesis model is not configured');

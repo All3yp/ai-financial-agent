@@ -42,7 +42,7 @@ export function Chat({
   const [selectedProviderId, setSelectedProviderId] = useState<string>(getDefaultProviderId());
 
   // Get all providers and selected provider config
-  const providers = useMemo(() => getProviders(), [selectedProviderId]);
+  const providers = useMemo(() => getProviders(), []);
   const selectedProvider = useMemo(() => getProviderById(selectedProviderId), [selectedProviderId]);
 
   const {

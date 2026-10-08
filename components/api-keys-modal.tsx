@@ -36,7 +36,7 @@ import {
   removeCustomModel,
   getCustomModels,
   type Model,
-  getAllModels,
+  getChatModels,
 } from '@/lib/ai/models';
 import type { ModelProviderConfig } from '@/lib/db/api-keys';
 
@@ -55,7 +55,7 @@ function ProviderModelsSection({
   onUpdate: (id: string, updates: Partial<ModelProviderConfig>) => void;
 }) {
   const [showModels, setShowModels] = useState(false);
-  const allModels = getAllModels(provider.id);
+  const allModels = getChatModels(provider.id);
   const enabledModelIds = provider.enabledModelIds || [];
 
   const handleToggleModel = (modelId: string) => {
@@ -87,7 +87,7 @@ function ProviderModelsSection({
         }`}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <RadioGroupItem value={provider.id} className="flex-shrink-0" />
+          <RadioGroupItem value={provider.id} className="shrink-0" />
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium truncate">{provider.name}</span>

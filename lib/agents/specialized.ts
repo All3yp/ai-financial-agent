@@ -7,7 +7,7 @@ import {
   createAgentConfig,
   registerAgent,
 } from './base';
-import { getAllModels } from '../ai/models';
+import { getChatModels } from '../ai/models';
 import { customModel } from '../ai';
 import { validStockSearchFilters } from '../api/stock-filters';
 import {
@@ -312,7 +312,7 @@ OUTPUT FORMAT:
 
       // Use LLM for analysis
       const { streamText } = await import('ai');
-      const model = getAllModels().find((m) => m.id === this.config.modelId);
+      const model = getChatModels().find((m) => m.id === this.config.modelId);
       if (!model) throw new Error(`Model ${this.config.modelId} not found`);
       const modelInstance = customModel(model.apiIdentifier, {
         apiKey: process.env.OPENAI_API_KEY || '',
@@ -687,7 +687,7 @@ OUTPUT: Markdown formatted report ready for display/export`,
 
     try {
       const { streamText } = await import('ai');
-      const model = getAllModels().find((m) => m.id === this.config.modelId);
+      const model = getChatModels().find((m) => m.id === this.config.modelId);
       if (!model) throw new Error(`Model ${this.config.modelId} not found`);
       const modelInstance = customModel(model.apiIdentifier, {
         apiKey: process.env.OPENAI_API_KEY || '',

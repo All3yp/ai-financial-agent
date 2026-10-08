@@ -9,6 +9,8 @@ import {
   getDefaultModel,
   isBuiltInModel,
   getProviderForModel,
+  isChatModel,
+  filterChatModels,
 } from './model-catalog';
 import { getProviderById } from '@/lib/db/api-keys';
 
@@ -20,6 +22,8 @@ export {
   getDefaultModel,
   isBuiltInModel,
   getProviderForModel,
+  isChatModel,
+  filterChatModels,
 };
 
 // Default model name (from catalog)
@@ -69,9 +73,22 @@ export const getAllModels = (providerId?: string): Model[] => {
   return allModels;
 };
 
+export const getBuiltInChatModels = (providerId?: string): Model[] =>
+  getAllBuiltInModels().filter(
+    (model) => isChatModel(model) && (!providerId || !model.providerId || model.providerId === providerId),
+  );
+
+export const getChatModels = (providerId?: string): Model[] =>
+  filterChatModels(getAllModels(providerId));
+
+export const findChatModel = (
+  modelId: string,
+  models: Model[] = getChatModels(),
+): Model | undefined => models.find((model) => model.id === modelId && isChatModel(model));
+
 // Get models for a specific provider (includes custom models + provider filtering)
 export const getModelsForProvider = (providerId: string): Model[] => {
-  const allModels = getAllModels(providerId);
+  const allModels = getChatModels(providerId);
   const provider = getProviderById(providerId);
   
   // If provider has enabledModelIds configured, filter to only those models

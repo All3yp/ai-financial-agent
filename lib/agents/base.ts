@@ -2,7 +2,7 @@
 // Agents can run independently, communicate with each other, and execute complex workflows
 
 import { customModel } from '../ai';
-import { getAllModels } from '../ai/models';
+import { getChatModels } from '../ai/models';
 import { FinancialToolsManager } from '../ai/tools/financial-tools';
 import { generateUUID } from '../utils';
 
@@ -154,7 +154,7 @@ export abstract class BaseAgent {
   abstract execute(task: AgentTask): Promise<any>;
 
   protected async callLLM(messages: any[], tools?: any) {
-    const model = getAllModels().find((m) => m.id === this.config.modelId);
+    const model = getChatModels().find((m) => m.id === this.config.modelId);
     if (!model) throw new Error(`Model ${this.config.modelId} not found`);
 
     const modelInstance = customModel(model.apiIdentifier, {

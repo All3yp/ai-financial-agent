@@ -11,9 +11,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  getAllBuiltInModels,
+  getBuiltInChatModels,
   getCustomModels,
   removeCustomModel,
+  isChatModel,
   getModelsForProvider,
 } from '@/lib/ai/models';
 import { getDefaultProviderId } from '@/lib/db/api-keys';
@@ -32,11 +33,11 @@ export function ModelSelector({
     useOptimistic(selectedModelId);
 
   // Get the current provider ID to filter models
-  const providerId = useMemo(() => getDefaultProviderId(), [optimisticModelId]);
+  const providerId = useMemo(() => getDefaultProviderId(), []);
 
   const allModels = useMemo(
     () => getModelsForProvider(providerId),
-    [providerId, optimisticModelId],
+    [providerId],
   );
 
   const selectedModel = useMemo(
@@ -47,9 +48,11 @@ export function ModelSelector({
   const customModels = useMemo(
     () =>
       getCustomModels().filter(
-        (m) => !m.providerId || m.providerId === providerId,
+        (model) =>
+          isChatModel(model) &&
+          (!model.providerId || model.providerId === providerId),
       ),
-    [providerId, optimisticModelId],
+    [providerId],
   );
 
   return (
@@ -72,8 +75,7 @@ export function ModelSelector({
       >
         {/* Default Models */}
         <div className="space-y-1">
-          {getAllBuiltInModels()
-            .filter((m) => !m.providerId || m.providerId === providerId)
+          {getBuiltInChatModels(providerId)
             .map((model) => (
               <DropdownMenuItem
                 key={model.id}

@@ -2,6 +2,7 @@
 // Handles agent scheduling, workflows, and async execution
 
 import { Inngest } from 'inngest';
+import type { EvidenceGapDecisionMode } from '@/lib/ai/decisions/evidence-gap';
 
 // Create Inngest client
 export const inngest = new Inngest({
@@ -51,17 +52,29 @@ export async function requestDebate(
   question: string,
   userId?: string,
   runId?: string,
+  decisionMode: EvidenceGapDecisionMode = 'off',
 ) {
   await sendEvent(
     AgentEvents.DEBATE_REQUESTED,
-    {
-      ticker,
-      question,
-      userId,
-      runId,
-    },
+    buildDebateEventData(ticker, question, userId, runId, decisionMode),
     runId,
   );
+}
+
+export function buildDebateEventData(
+  ticker: string,
+  question: string,
+  userId?: string,
+  runId?: string,
+  decisionMode: EvidenceGapDecisionMode = 'off',
+) {
+  return {
+    ticker,
+    question,
+    userId,
+    runId,
+    decisionMode,
+  };
 }
 
 export async function requestScreening(

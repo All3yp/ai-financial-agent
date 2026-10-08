@@ -7,6 +7,8 @@ User-facing documentation: [User Guide](docs/GUIA_DO_USUARIO.md),
 [Runnable Fixture Instructions](docs/exemplos/README.md). These guides describe
 commands, inputs, actual agent execution, privacy and current limitations.
 
+`.github/copilot-instructions.md` and `.github/agents/*.agent.md` are development-time Copilot instructions and personas, not runtime financial-agent registration. Verify application capabilities in code and document them in the guides under `docs/`. `.tasks/TODO.md` owns current task and status tracking.
+
 This project implements an **autonomous multi-agent financial analysis system** built on Next.js 15, Inngest (background jobs), and OpenRouter (free tier models).
 
 ---

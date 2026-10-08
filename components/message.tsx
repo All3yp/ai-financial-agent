@@ -208,7 +208,7 @@ export const ThinkingMessage = () => {
       data-role={role}
     >
       <div className="flex items-center gap-2">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+        <div className="size-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
         <span className="text-sm text-[#9FA2A5]">Researching</span>
       </div>
     </motion.div>
@@ -239,7 +239,7 @@ export const LoadingMessage = ({
           <div className="flex flex-col gap-4 text-muted-foreground">
             {loadingMessages.map((message) => (
               <div key={message} className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                <div className="size-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent text-[#9FA2A5] align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
                 <span className="text-sm text-[#9FA2A5]">{message}</span>
               </div>
             ))}

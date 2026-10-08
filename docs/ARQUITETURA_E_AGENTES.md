@@ -163,35 +163,19 @@ Lê `priceData.historical.prices` e usa [latestHistoricalPricePair](../lib/agent
 
 Chamadas diretas de tradicionais em rotas/Inngest criam objetos task mas não os inserem previamente em `agentMemory`. `updateTaskStatus` só muda task encontrada; logo a memória não é telemetria confiável de todas essas execuções. Helpers de espera sondam respostas em memória com timeout, não constituem entrega durável.
 
-### 5.1 Trigger e execução dupla
+### 5.1 Trigger e execução durável
 
-[app/api/agents/trigger/route.ts](../app/api/agents/trigger/route.ts) inicializa tradicionais com ambiente. Após sessão e validações superficiais de campos, o switch aceita analysis/debate/screening/monitoring. Cada ramo aguarda helper `request...` do cliente Inngest, depois roda agentes diretamente para feedback imediato.
+[app/api/agents/trigger/route.ts](../app/api/agents/trigger/route.ts) exige sessão e encaminha os quatro tipos manuais ao helper de submissão. Cada execução cria primeiro um `AgentRun` owner-scoped, valida uma chave `Idempotency-Key` UUID e envia um evento Inngest com o ID do run como event ID. A rota retorna `202` e não executa o workflow sincronamente. Repetir a mesma chave com mesmo workflow/entrada retorna o run existente; entrada diferente retorna conflito. Há limite de três runs ativos por usuário.
 
-```mermaid
-sequenceDiagram
-  participant U as Dashboard
-  participant T as API trigger
-  participant I as Inngest
-  participant S as Agentes síncronos
-  participant B as Agentes de background
-  U->>T: workflowType e data, com sessão
-  T->>I: Enviar evento e aguardar aceitação
-  I-->>T: Evento aceito
-  par Execução HTTP
-    T->>S: Research / Analysis / Report ou Screen / Monitor
-    S-->>T: Resultado imediato
-    T-->>U: success e data
-  and Consumo do evento
-    I->>B: Executar workflow novamente
-    B-->>I: Resultado do job e logs
-  end
-```
-
-Não existe chave de idempotência ligando as duas execuções. O envio bem-sucedido não garante consumo, e a resposta HTTP não certifica sucesso do background. Erro no envio impede o ramo síncrono; erro posterior não remove o evento já aceito. Essa arquitetura pode gerar duas consultas, duas interpretações e dois relatórios distintos por um clique.
+Inngest executa etapas nomeadas com replay próprio; `AgentRunStep` persiste uma projeção dos estados/resultados para histórico, não é mecanismo de retomada. Falhas são sanitizadas e gravadas. `/api/agents/runs` e `/api/agents/runs/[id]` filtram por proprietário, e a aba History consulta os registros enquanto está aberta. Runs e etapas expiram após 90 dias. Enfileiramento não garante execução se Inngest não estiver configurado/disponível; submissão e envio não são uma transação distribuída.
 
 Analysis HTTP: Research quarterly/20, Analysis com peers, Report com `peers: {}` no payload de relatório. Analysis Inngest: research principal, análise e research de peers em paralelo, depois relatório com dados de peers. Logo os dois caminhos também diferem no conteúdo produzido.
 
-Debate HTTP/Inngest: research, dois AnalysisAgents com perspectiva/instrução bull e bear aplicadas por `buildAnalysisPrompt`, síntese com `thinkingmachines/inkling:free`, Report. A pergunta entra na síntese; prompts distintos não garantem consenso ou validade financeira. Screening/Monitoring também duplicam quando há consumidor ativo. Nenhum desses resultados tradicionais é salvo pelo workflow como carteira persistente.
+Debate Inngest: research, duas AnalysisAgents com perspectiva/instrução bull e bear aplicadas por `buildAnalysisPrompt`, síntese com `thinkingmachines/inkling:free`, Report. A pergunta entra na síntese; prompts distintos não garantem consenso ou validade financeira. Com `EVIDENCE_GAP_DECISION_MODE=deterministic`, o servidor inclui o modo no evento submetido e uma etapa `evidence-gap-decision` verifica preços, demonstrações, cash flows e métricas retornados pela ResearchAgent. Cada categoria precisa conter linhas com campos financeiros numéricos reconhecidos e datas válidas (`time` ou `report_period`); linhas ausentes, metadata-only, malformadas ou sem cobertura de datas permanecem desconhecidas. Somente `sufficient_for_summary` prossegue; faltas/estados desconhecidos produzem resultado unresolved persistido e encerram o run antes das análises. O modo padrão `off` não adiciona etapa nem altera o caminho atual. Essa verificação não aplica limite de idade aos dados, nem confirma qualidade, atualidade, licenciamento ou suficiência financeira. A ResearchAgent não coleta eventos recentes nem conflitos estruturados.
+
+Mercury Decide permanece apenas uma entrada existente do catálogo OpenRouter chat; não foi verificado nem implementado um Decisions API. A interface/provider contract de evidência é interno e testado com mocks, mas o workflow atual usa apenas a política determinística. Não há chamada externa adicional, loop de coleta, autorização de transação ou impacto nos cálculos quantitativos.
+
+Para executar a fixture sintética de roteamento: `pnpm evidence-gap:evaluate`. O resultado inclui acurácia das rotas esperadas, unresolved count/rate, fallback rate e latência local. Essa fixture valida apenas o comportamento implementado, não calibração, suficiência financeira nem desempenho de modelos/mercado.
 
 ### 5.2 Inngest
 

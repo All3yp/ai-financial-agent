@@ -370,26 +370,26 @@ export function AgentDashboard() {
   const getStatusIcon = (status: WorkflowResult['status']) => {
     switch (status) {
       case 'running':
-        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+        return <Loader2 className="size-4 animate-spin text-blue-500" />;
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="size-4 text-green-500" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="size-4 text-red-500" />;
       default:
-        return <RefreshCw className="w-4 h-4 text-muted-foreground" />;
+        return <RefreshCw className="size-4 text-muted-foreground" />;
     }
   };
 
   const getAgentStatusIcon = (status: AgentStatus['status']) => {
     switch (status) {
       case 'running':
-        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+        return <Loader2 className="size-4 animate-spin text-blue-500" />;
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="size-4 text-green-500" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="size-4 text-red-500" />;
       default:
-        return <Brain className="w-4 h-4 text-muted-foreground" />;
+        return <Brain className="size-4 text-muted-foreground" />;
     }
   };
 
@@ -404,7 +404,7 @@ export function AgentDashboard() {
           </p>
         </div>
         <Badge variant="secondary" className="gap-1">
-          <Zap className="w-3 h-3" />
+          <Zap className="size-3" />
           Powered by Inngest
         </Badge>
       </div>
@@ -413,20 +413,20 @@ export function AgentDashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="workflows">
-            <Play className="w-4 h-4 mr-2" /> Workflows
+            <Play className="size-4 mr-2" /> Workflows
           </TabsTrigger>
           <TabsTrigger value="agents">
-            <Brain className="w-4 h-4 mr-2" /> Agents
+            <Brain className="size-4 mr-2" /> Agents
           </TabsTrigger>
           <TabsTrigger value="quantitative">
             <Brain className="mr-2 size-4" />
             Quantitative
           </TabsTrigger>
           <TabsTrigger value="monitoring">
-            <Bell className="w-4 h-4 mr-2" /> Monitoring
+            <Bell className="size-4 mr-2" /> Monitoring
           </TabsTrigger>
           <TabsTrigger value="history">
-            <FileText className="w-4 h-4 mr-2" /> History
+            <FileText className="size-4 mr-2" /> History
           </TabsTrigger>
         </TabsList>
 
@@ -437,7 +437,7 @@ export function AgentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
+                  <Brain className="size-5" />
                   Full Analysis
                 </CardTitle>
               </CardHeader>
@@ -469,7 +469,7 @@ export function AgentDashboard() {
                     disabled={isLoading || !analysisTicker}
                     className="w-full"
                   >
-                    <Play className="w-4 h-4 mr-2" /> Run Analysis
+                    <Play className="size-4 mr-2" /> Run Analysis
                   </Button>
                 </div>
               </CardContent>
@@ -479,7 +479,7 @@ export function AgentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
+                  <AlertTriangle className="size-5" />
                   Bull vs Bear Debate
                 </CardTitle>
               </CardHeader>
@@ -511,7 +511,7 @@ export function AgentDashboard() {
                     disabled={isLoading || !debateTicker}
                     className="w-full"
                   >
-                    <Play className="w-4 h-4 mr-2" /> Start Debate
+                    <Play className="size-4 mr-2" /> Start Debate
                   </Button>
                 </div>
               </CardContent>
@@ -521,7 +521,7 @@ export function AgentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Search className="w-5 h-5" />
+                  <Search className="size-5" />
                   Stock Screening
                 </CardTitle>
               </CardHeader>
@@ -541,7 +541,7 @@ export function AgentDashboard() {
                     disabled={isLoading}
                     className="w-full"
                   >
-                    <Play className="w-4 h-4 mr-2" /> Run Screen
+                    <Play className="size-4 mr-2" /> Run Screen
                   </Button>
                 </div>
               </CardContent>
@@ -551,7 +551,7 @@ export function AgentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
+                  <Eye className="size-5" />
                   Portfolio Monitor
                 </CardTitle>
               </CardHeader>
@@ -571,7 +571,7 @@ export function AgentDashboard() {
                     disabled={isLoading}
                     className="w-full"
                   >
-                    <Play className="w-4 h-4 mr-2" /> Check Now
+                    <Play className="size-4 mr-2" /> Check Now
                   </Button>
                 </div>
               </CardContent>
@@ -624,7 +624,7 @@ export function AgentDashboard() {
                               alert(JSON.stringify(workflow.result, null, 2))
                             }
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="size-4" />
                           </Button>
                         )}
                       </div>
@@ -677,10 +677,10 @@ export function AgentDashboard() {
                   )}
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1">
-                      <RefreshCw className="w-4 h-4 mr-1" /> Test Run
+                      <RefreshCw className="size-4 mr-1" /> Test Run
                     </Button>
                     <Button variant="ghost" size="sm">
-                      <Eye className="w-4 h-4" />
+                      <Eye className="size-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -694,7 +694,7 @@ export function AgentDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5" />
+                <Bell className="size-5" />
                 Scheduled Monitoring
               </CardTitle>
             </CardHeader>
