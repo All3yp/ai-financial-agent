@@ -1,46 +1,29 @@
-// Define your models here.
+// Model definitions and management
+// Built-in models are defined in model-catalog.ts for better organization
+// Custom models are stored in localStorage and managed via the UI
 
-export interface Model {
-  id: string;
-  label: string;
-  apiIdentifier: string;
-  description: string;
-  isCustom?: boolean;
-  providerId?: string; // Optional: associate model with a specific provider
-}
+import { Model } from './model-catalog';
+import {
+  getAllBuiltInModels,
+  getModelsForProvider as getCatalogModelsForProvider,
+  getDefaultModel,
+  isBuiltInModel,
+  getProviderForModel,
+} from './model-catalog';
+import { getProviderById } from '@/lib/db/api-keys';
 
-export const models: Array<Model> = [
-  {
-    id: 'gpt-4.1-nano-2025-04-14',
-    label: 'GPT 4.1 nano',
-    apiIdentifier: 'gpt-4.1-nano-2025-04-14',
-    description: 'Fastest, most cost-effective GPT-4.1 model',
-    providerId: 'default',
-  },
-  {
-    id: 'gpt-4.1-mini-2025-04-14',
-    label: 'GPT 4.1 mini',
-    apiIdentifier: 'gpt-4.1-mini-2025-04-14',
-    description: 'Balance between intelligence, speed, and cost',
-    providerId: 'default',
-  },
-  {
-    id: 'gpt-4.1-2025-04-14',
-    label: 'GPT 4.1',
-    apiIdentifier: 'gpt-4.1-2025-04-14',
-    description: 'Flagship model for complex tasks',
-    providerId: 'default',
-  },
-  {
-    id: 'gpt-4o',
-    label: 'GPT-4o',
-    apiIdentifier: 'gpt-4o',
-    description: 'Omni-purpose model for complex tasks',
-    providerId: 'default',
-  },
-] as const;
+// Re-export Model interface and catalog functions
+export type { Model };
+export {
+  getAllBuiltInModels,
+  getCatalogModelsForProvider,
+  getDefaultModel,
+  isBuiltInModel,
+  getProviderForModel,
+};
 
-export const DEFAULT_MODEL_NAME: string = 'gpt-4o';
+// Default model name (from catalog)
+export const DEFAULT_MODEL_NAME: string = getDefaultModel();
 
 // Custom models storage key
 const CUSTOM_MODELS_KEY = 'customModels';
@@ -73,9 +56,11 @@ export const removeCustomModel = (modelId: string) => {
   setCustomModels(customModels.filter(m => m.id !== modelId));
 };
 
+// Get all models (built-in + custom), optionally filtered by provider
 export const getAllModels = (providerId?: string): Model[] => {
   const customModels = getCustomModels();
-  const allModels = [...models, ...customModels];
+  const builtInModels = getAllBuiltInModels();
+  const allModels = [...builtInModels, ...customModels];
   
   if (providerId) {
     return allModels.filter(m => !m.providerId || m.providerId === providerId);
@@ -84,8 +69,7 @@ export const getAllModels = (providerId?: string): Model[] => {
   return allModels;
 };
 
-import { getProviderById } from '@/lib/db/api-keys';
-
+// Get models for a specific provider (includes custom models + provider filtering)
 export const getModelsForProvider = (providerId: string): Model[] => {
   const allModels = getAllModels(providerId);
   const provider = getProviderById(providerId);

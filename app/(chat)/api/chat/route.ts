@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
 import { customModel } from '@/lib/ai';
-import { models } from '@/lib/ai/models';
+import { getAllModels } from '@/lib/ai/models';
 import {
   systemPrompt,
 } from '@/lib/ai/prompts';
@@ -82,7 +82,8 @@ export async function POST(request: Request) {
   const modelsToTry: ModelConfig[] = [];
   
   // Add primary model
-  const primaryModel = models.find((m) => m.id === modelId);
+  const allModels = getAllModels();
+  const primaryModel = allModels.find((m) => m.id === modelId);
   if (!primaryModel) {
     return new Response('Primary model not found', { status: 404 });
   }
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
   // Add fallback models if provided
   if (modelFallback?.models?.length) {
     for (const fallback of modelFallback.models) {
-      const model = models.find((m) => m.id === fallback.id);
+      const model = allModels.find((m) => m.id === fallback.id);
       if (model) {
         modelsToTry.push({
           id: model.id,

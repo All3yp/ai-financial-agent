@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { models, getAllModels, getCustomModels, removeCustomModel, getModelsForProvider } from '@/lib/ai/models';
+import { getAllBuiltInModels, getAllModels, getCustomModels, removeCustomModel, getModelsForProvider } from '@/lib/ai/models';
 import { getDefaultProviderId } from '@/lib/db/api-keys';
 import { cn } from '@/lib/utils';
 
@@ -61,7 +61,7 @@ export function ModelSelector({
       <DropdownMenuContent align="start" className="min-w-[300px] max-h-[400px] overflow-y-auto">
         {/* Default Models */}
         <div className="space-y-1">
-          {models.filter(m => !m.providerId || m.providerId === providerId).map((model) => (
+          {getAllBuiltInModels().filter(m => !m.providerId || m.providerId === providerId).map((model) => (
             <DropdownMenuItem
               key={model.id}
               onSelect={() => {
