@@ -160,10 +160,13 @@ the shared `FinancialDataClient`, used by chat and agent financial tools.
   bounded historical pagination, optional amendments and official document/index
   links. `getSECFinancialFacts` returns validated standard XBRL observations;
   `getSECFilingSections` extracts Business, Risk Factors and MD&A from discovered
-  10-K/10-Q HTML documents. Full statement reconstruction and OCR remain unavailable.
+  10-K/10-Q HTML documents. `getSECInsiderTransactions` parses reported
+  non-derivative and derivative rows from Form 4/4-A. Full statement
+  reconstruction and OCR remain unavailable.
 - ❌ Earnings call transcripts
 - ❌ Analyst estimates/ratings
-- ❌ Insider transactions (Form 4)
+- SEC Form 4/4-A reported transactions are available through
+  `getSECInsiderTransactions`; this does not infer trades or unreported activity.
 - ❌ Institutional holdings (13F)
 - ❌ Options flow / Greeks
 - ❌ Short interest data
@@ -363,6 +366,17 @@ remain null; text is limited per section (20,000 characters by default, at most
 Unconventional headings, external CSS visibility, scanned PDFs and OCR are not
 supported. Filing text remains untrusted data, never agent instructions.
 
+`getSECInsiderTransactions({ ticker, limit?, includeHistorical?,
+includeAmendments?, maxArchivePages? })` discovers Form 4/4-A submissions and
+downloads only each discovered primary document (5 MB maximum). It validates
+the issuer CIK and document form, extracts reporting-owner roles plus
+non-derivative and derivative transactions, and retains SEC transaction codes.
+Missing prices and ownership fields remain null; codes are not translated into
+recommendations. Historical coverage is bounded by the same archive-page limits;
+filings without a primary document are explicitly skipped. This does not cover
+13D/13G beneficial-ownership forms, infer unreported activity, or implement the
+planned cluster-buying InsiderAgent.
+
 - [ ] **Earnings Intelligence**
   - [ ] `getEarningsTranscripts(ticker, quarter)`
   - [ ] `getEarningsCalendar(dateRange)`
@@ -370,7 +384,7 @@ supported. Filing text remains untrusted data, never agent instructions.
   - [ ] `getGuidanceHistory(ticker)` - raise/lower tracking
 
 - [ ] **Ownership & Insider Data**
-  - [ ] `getInsiderTransactions(ticker)` - Form 4 parsing
+  - [x] `getSECInsiderTransactions(ticker)` - bounded Form 4/4-A parsing
   - [ ] `getInstitutionalHoldings(ticker)` - 13F parsing
   - [ ] `getShortInterest(ticker)` - short float, days to cover
 
