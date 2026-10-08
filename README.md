@@ -32,6 +32,7 @@ Stack: Next.js App Router, React, TypeScript, AI SDK, PostgreSQL/Drizzle, NextAu
 - [Guia do usuário](docs/GUIA_DO_USUARIO.md): instalação, privacidade, chat, workflows, JSON quantitativo, comandos, API e troubleshooting.
 - [Provedores de dados](docs/PROVEDORES_DE_DADOS.md): alternativas, integrações existentes, critérios de escolha e limites.
 - [Arquitetura e agentes](docs/ARQUITETURA_E_AGENTES.md): contratos, execução, matemática, fontes, limitações e backlog.
+- [Roadmap](docs/ROADMAP.md): TODOs, progresso verificado, dependências externas e modos futuros.
 - [Verificação local](docs/VALIDACAO.md): testes, build, validação visual e o que não foi confirmado ao vivo.
 - [Exemplos e advertências](docs/exemplos/README.md): uso da única [fixture quantitativa completa](docs/exemplos/quantitative-fixture.json), com mercado e carteira sintéticos.
 
