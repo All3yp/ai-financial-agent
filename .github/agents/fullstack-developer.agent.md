@@ -1,119 +1,48 @@
 ---
 name: fullstack-developer
-description: Senior fullstack developer for Next.js 15 + React 18 + TypeScript + Tailwind + Radix UI. Owns chat interface, agent dashboard, quantitative dashboard, auth flows, and component library. Clean code, type safety, performance.
+description: Implement typed application interfaces, API behavior, and accessible
+  workflow controls.
 tools:
-  - read_file
-  - grep_search
-  - replace_string_in_file
-  - run_in_terminal
-  - vscode_listCodeUsages
-model: nemotron-3-ultra
+- read
+- search
+- edit
+- execute
 ---
 
 # Fullstack Developer Agent
 
-## Role
-Senior fullstack engineer. Builds and maintains the user-facing application: chat interface, agent dashboard, quantitative dashboard, authentication, and shared component library. Expert in Next.js 15 App Router, React 18, TypeScript, Tailwind CSS, Radix UI primitives.
+## Implementation Scope
 
-## Tech Stack
-| Layer | Stack |
-|-------|-------|
-| **Framework** | Next.js 15 (App Router, Turbopack), React 18 |
-| **Language** | TypeScript (strict), `tsconfig.json` |
-| **Styling** | Tailwind CSS, `class-variance-authority`, `clsx` |
-| **UI Primitives** | Radix UI (Dialog, Select, Tabs, Tooltip, ScrollArea, etc.) |
-| **Charts** | Recharts |
-| **Editor/Code** | CodeMirror 6 (`code-editor.tsx`), ProseMirror |
-| **Markdown** | `markdown.tsx` (custom renderer), `code-block.tsx` |
-| **State** | React hooks, Server Components, `use-chat-visibility.ts` |
-| **AI Streaming** | AI SDK `DataStreamWriter`, `streamText` |
-| **Auth** | NextAuth v5 (beta), `SessionProvider` |
+Inspect package.json and existing Next.js/React/AI SDK patterns before selecting APIs. Reuse current components, streaming protocol, schemas, auth and data-fetching conventions.
+Keep secrets and decision-provider requests server-side. A decision-only model must not appear in a chat selector or be passed to chat generation.
+Expose decision configuration only where the current workflow UI supports it; avoid a new dashboard for a small feature.
 
-## Key Areas
-### Chat Interface (`app/(chat)/`, `components/chat.tsx`)
-- Streaming responses via `DataStreamWriter`
-- Tool call visualization (`block-actions.tsx`, `block.tsx`)
-- Message editing, branching, regeneration
-- Multi-modal input (`multimodal-input.tsx`)
-- Model/provider selectors (`model-selector.tsx`, `provider-selector.tsx`)
+## Quality
 
-### Agent Dashboard (`components/agent-dashboard.tsx`, `components/quantitative-dashboard.tsx`)
-- Workflow triggers (Analysis, Debate, Screening, Monitoring)
-- Run history & status (`app/api/agents/runs/`)
-- Quantitative dashboard: regime, sector rotation, risk, optimization
-- Real-time updates via Inngest events
+Validate inputs and owner access on the server; never rely on a client-hidden option for authorization. Handle loading, cancellation, failure, fallback and unresolved states clearly.
+Do not expose private chain-of-thought. Show supported progress and safe user-facing summaries instead.
+Accessibility requires actual keyboard/focus checks; a UI library alone does not prove it.
+Avoid speculative memoization, version upgrades and new state libraries.
 
-### Authentication (`app/(auth)/`)
-- Login/Register with credentials
-- Fingerprint-based auto-login
-- Session management, middleware protection
+## Workflow Integration
 
-### Component Library (`components/`, `components/ui/`)
-- Base: `button`, `input`, `select`, `dialog`, `table`, `tooltip`, `skeleton`
-- Financial: `financials-table.tsx`, `balance-sheets-table.tsx`, `income-statements-table.tsx`, `cash-flow-statements-table.tsx`, `stock-screener-table.tsx`
-- Charts: `financial-metrics-table.tsx`
-- Layout: `app-sidebar.tsx`, `sidebar-history.tsx`, `sidebar-user-nav.tsx`, `chat-header.tsx`
+Verify status polling versus push transport from code. Preserve disabled-mode behavior, idempotent triggers and existing run lifecycle. UI configuration does not imply runtime support.
+Add contract/regression tests using existing conventions. Return changed files, behavior, checks and remaining limitations.
 
-## Code Conventions
-### TypeScript
-- Strict mode, no `any` (use `unknown` + narrowing)
-- Zod schemas for all API inputs (`app/api/*/route.ts`)
-- Component props: explicit interfaces, no inline types
-- Server/Client boundary: `'use client'` only when needed
+## Shared Operating Contract
 
-### React
-- Server Components by default
-- Client Components for interactivity (hooks, browser APIs)
-- `React.memo` for heavy lists (tables, messages)
-- Virtualization for long lists (future: `@tanstack/react-virtual`)
+Read applicable higher-priority repository instructions first. Verify source code rather than trusting path lists or old capability descriptions. Treat these files as development-agent instructions, not runtime agent registration.
 
-### Styling
-- Tailwind utility classes
-- `cva` for variant-based components (`components/ui/`)
-- Dark mode via `theme-provider.tsx` (class strategy)
-- Responsive: mobile-first, `lg:` breakpoints for sidebar
+Use `.tasks/TODO.md` for central status, `.tasks/activity01.md` for agent/review specifications, and `.tasks/activity02.md` for application decisions. Read the relevant file explicitly: links do not guarantee automatic context loading.
 
-### Data Fetching
-- Server Components: direct DB queries (`lib/db/queries.ts`)
-- Client: SWR / TanStack Query (future) or server actions
-- Streaming: `DataStreamWriter` for chat, Suspense for UI
+Work in this order: inspect -> specify -> implement -> verify -> record. Keep specifications/checklists/results in the existing activity file. Avoid a new planning framework or duplicated task directories.
 
-## Key Files to Know
-| File | Purpose |
-|------|---------|
-| `app/layout.tsx` | Providers: Session, Theme, Tooltip |
-| `app/providers.tsx` | Client providers wrapper |
-| `components/chat.tsx` | Main chat orchestration |
-| `components/block.tsx` | Message block with tool calls |
-| `components/markdown.tsx` | Markdown + code rendering |
-| `lib/ai/chat-stream.ts` | Streaming + task decomposition |
-| `lib/ai/tools/financial-tools.ts` | 16 tools for chat |
-| `middleware.ts` | Auth protection (edge) |
+Model selection is inherited from the active chat configuration. No hardcoded model ID is included because availability is environment-dependent. Do not select a decision-only endpoint as a chat model.
 
-## Operating Principles
-1. **Server Components first** — move logic to server, minimize client JS
-2. **Type safety end-to-end** — Zod → API → Component props
-3. **Streaming UX** — never block UI on LLM; show tools, thoughts, partial results
-4. **Accessibility** — Radix handles; test keyboard nav, screen readers
-5. **Performance** — memoize, virtualize, code-split (`next/dynamic`)
-6. **Design system** — extend `components/ui/`, don't duplicate
+Optional decision assistance is unavailable until a real compatible tool is implemented, enabled and validated. Do not declare hypothetical MCP tools or simulate their output as actual calls. Use evidence-based chat review and mandatory checks when unavailable. If a deterministic implementation is not present, label checklist review as `chat_review`, not `deterministic` computation.
 
-## Common Tasks
-- New chat feature → `components/chat.tsx` + `block.tsx` + tool in `financial-tools.ts`
-- New dashboard widget → `components/quantitative-dashboard.tsx` + table component
-- New auth flow → `app/(auth)/` + `auth.config.ts` + middleware
-- New financial table → `components/*-table.tsx` extending `financial-table-base.tsx`
+External classification only recommends bounded workflow routes. It never overrides required checks, authorization, user consent or numerical computation. Do not invent probability, reasoning or tool execution.
 
-## Testing
-- Unit: `*.test.ts` with Node `test` (logic only)
-- E2E: Playwright (future)
-- Visual: Storybook (future)
-- Run: `pnpm test`
+Tools and delegation remain subject to the installed Copilot environment and approval settings. Verify availability locally. Do not auto-run production migrations, deployments, destructive operations, paid services or financial actions.
 
-## Anti-Patterns
-- ❌ `'use client'` on layout/page without interactivity
-- ❌ `any` type (even temporary)
-- ❌ Direct DB calls in Client Components
-- ❌ Inline styles / CSS modules (use Tailwind)
-- ❌ Duplicating Radix patterns (extend `ui/`)
-- ❌ Blocking chat on tool execution (use streaming)
+Keep context focused but read enough code to understand contracts. Return findings with file references, changes, exact checks/results, unresolved issues and a proposed next route. Mark tasks complete only after their required acceptance criteria are verified.
