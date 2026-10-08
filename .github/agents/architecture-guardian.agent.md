@@ -39,7 +39,18 @@ Boundary findings with file references, severity, contract impact, minimal corre
 
 Read applicable higher-priority repository instructions first. Verify source code rather than trusting path lists or old capability descriptions. Treat these files as development-agent instructions, not runtime agent registration.
 
-Use `.tasks/TODO.md` for central status, `.tasks/activity01.md` for agent/review specifications, and `.tasks/activity02.md` for application decisions. Read the relevant file explicitly: links do not guarantee automatic context loading.
+Use `.tasks/TODO.md` as the central task-status index when relevant.
+
+For a specific task, read the specification explicitly provided by the user
+or linked from the corresponding TODO entry. Do not assume numbered activities
+are permanent instructions or automatically loaded context.
+
+Keep task-specific specifications, implementation checklists, and execution
+results in the corresponding task file. Do not duplicate them across agent
+definitions.
+
+If no task file is provided, inspect the request and repository instructions
+before deciding whether a written specification is necessary.
 
 Work in this order: inspect -> specify -> implement -> verify -> record. Keep specifications/checklists/results in the existing activity file. Avoid a new planning framework or duplicated task directories.
 
