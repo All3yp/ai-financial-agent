@@ -76,6 +76,10 @@ export const scheduledMonitoring = inngest.createFunction(
   { id: 'scheduled-monitoring', name: 'Scheduled Portfolio Monitoring' },
   { cron: '0 9-16 * * 1-5' },
   async ({ event, step }) => {
+    const occurrence =
+      typeof event.ts === 'number'
+        ? new Date(event.ts).toISOString().slice(0, 13)
+        : new Date().toISOString().slice(0, 13);
     const portfolios = await step.run('get-enabled-portfolios', () =>
       portfolioRepository.listEnabledPortfoliosForMonitoring(),
     );
@@ -87,21 +91,81 @@ export const scheduledMonitoring = inngest.createFunction(
     // Run monitor agent for each portfolio
     const results = await Promise.all(
       portfolios.map(async (portfolio) => {
-        return await step.run(`monitor-${portfolio.portfolioId}`, async () => {
-          const result = await agents.monitor.execute({
-            id: `monitor-${portfolio.portfolioId}-${Date.now()}`,
-            agentId: 'monitor-agent',
-            type: 'monitor',
-            input: { positions: portfolio.positions },
-            status: 'pending',
-            createdAt: new Date(),
-          });
+        const creation = await step.run(
+          `create-monitor-run-${portfolio.portfolioId}`,
+          () =>
+            agentRunStore.createScheduledMonitoringRun(
+              portfolio.userId,
+              portfolio.portfolioId,
+              `scheduled:${occurrence}`,
+              portfolio.positions,
+            ),
+        );
+        if (creation.kind === 'limit') {
+          return {
+            portfolioId: portfolio.portfolioId,
+            userId: portfolio.userId,
+            alerts: [],
+            skipped: 'active-run-limit',
+          };
+        }
+        if (creation.kind === 'conflict') {
+          return {
+            portfolioId: portfolio.portfolioId,
+            userId: portfolio.userId,
+            alerts: [],
+            skipped: 'portfolio-not-enabled',
+          };
+        }
+        const runId = creation.run.id;
+        if (
+          creation.kind === 'existing' &&
+          creation.run.status === 'completed'
+        ) {
+          return {
+            portfolioId: portfolio.portfolioId,
+            userId: portfolio.userId,
+            alerts: [],
+            runId,
+            skipped: 'already-processed',
+          };
+        }
+
+        await step.run(`monitor-start-${runId}`, () =>
+          agentRunStore.markRunRunning(runId),
+        );
+        try {
+          await step.run(`monitor-step-start-${runId}`, () =>
+            agentRunStore.markStepRunning(runId, 'monitor'),
+          );
+          const result = await step.run(`monitor-${runId}`, () =>
+            agents.monitor.execute({
+              id: runId,
+              agentId: 'monitor-agent',
+              type: 'monitor',
+              input: { positions: portfolio.positions },
+              status: 'pending',
+              createdAt: new Date(),
+            }),
+          );
+          await step.run(`monitor-step-result-${runId}`, () =>
+            agentRunStore.completeStep(runId, 'monitor', result),
+          );
+          await step.run(`monitor-run-result-${runId}`, () =>
+            agentRunStore.completeRun(runId, result),
+          );
           return {
             portfolioId: portfolio.portfolioId,
             userId: portfolio.userId,
             alerts: result.alerts,
+            runId,
           };
-        });
+        } catch (error) {
+          await step.run(`monitor-run-failure-${runId}`, () =>
+            agentRunStore.failRun(runId, sanitizeRunError(error)),
+          );
+          throw error;
+        }
       }),
     );
 
@@ -119,6 +183,7 @@ export const scheduledMonitoring = inngest.createFunction(
     return {
       monitored: portfolios.length,
       alerts: results.flatMap((r) => r.alerts).length,
+      skipped: results.filter((result) => 'skipped' in result).length,
     };
   },
 );

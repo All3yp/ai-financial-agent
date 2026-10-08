@@ -74,6 +74,20 @@ class MemoryRunStore implements AgentRunStore {
     return { kind: 'created', run: record };
   }
 
+  async createScheduledMonitoringRun(
+    userId: string,
+    portfolioId: string,
+    scheduleKey: string,
+    positions: Array<{ ticker: string; shares: number; costBasis?: number }>,
+  ) {
+    return this.createRun(
+      userId,
+      'scheduled-monitoring',
+      { portfolioId, positions },
+      `${portfolioId}:${scheduleKey}`,
+    );
+  }
+
   async markRunRunning(runId: string) {
     const entry = this.runs.get(runId);
     if (entry) entry.record.status = 'running';
@@ -322,6 +336,34 @@ test('run submissions require idempotency keys and cap active runs per owner', a
   );
   assert.equal(overLimit.status, 429);
   assert.equal(store.runs.size, 3);
+});
+
+test('scheduled run records preserve owner and portfolio-scoped occurrence identity', async () => {
+  const store = new MemoryRunStore();
+  const positions = [{ ticker: 'AAPL', shares: 3, costBasis: 180 }];
+  const first = await store.createScheduledMonitoringRun(
+    'alice',
+    '00000000-0000-4000-8000-000000000042',
+    'scheduled:2026-10-08T09',
+    positions,
+  );
+  assert.equal(first.kind, 'created');
+  if (first.kind !== 'created') throw new Error('Expected scheduled run');
+  assert.equal(first.run.workflowType, 'scheduled-monitoring');
+  assert.deepEqual(first.run.input, {
+    portfolioId: '00000000-0000-4000-8000-000000000042',
+    positions,
+  });
+
+  const replay = await store.createScheduledMonitoringRun(
+    'alice',
+    '00000000-0000-4000-8000-000000000042',
+    'scheduled:2026-10-08T09',
+    positions,
+  );
+  assert.equal(replay.kind, 'existing');
+  if (replay.kind !== 'existing') throw new Error('Expected replay');
+  assert.equal(replay.run.id, first.run.id);
 });
 
 test('screening submission rejects malformed or oversized criteria without enqueueing', async () => {

@@ -37,13 +37,16 @@ export const workflowRunSchemas = {
     .strict(),
 };
 
-export const agentWorkflowTypes = [
+export const manualAgentWorkflowTypes = [
   'analysis',
   'debate',
   'screening',
   'monitoring',
 ] as const;
-export type AgentWorkflowType = (typeof agentWorkflowTypes)[number];
+export type ManualAgentWorkflowType = (typeof manualAgentWorkflowTypes)[number];
+export type AgentWorkflowType =
+  | ManualAgentWorkflowType
+  | 'scheduled-monitoring';
 
 export type AgentRunStatus = 'pending' | 'running' | 'completed' | 'failed';
 
@@ -84,6 +87,12 @@ export interface AgentRunStore {
     workflowType: AgentWorkflowType,
     input: Record<string, unknown>,
     idempotencyKey: string,
+  ): Promise<CreateAgentRunResult>;
+  createScheduledMonitoringRun(
+    userId: string,
+    portfolioId: string,
+    scheduleKey: string,
+    positions: Array<{ ticker: string; shares: number; costBasis?: number }>,
   ): Promise<CreateAgentRunResult>;
   markRunRunning(runId: string): Promise<void>;
   markStepRunning(runId: string, name: string): Promise<void>;

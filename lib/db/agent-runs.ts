@@ -2,12 +2,13 @@ import 'server-only';
 
 import { and, asc, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 import { db } from './queries';
-import { agentRun, agentRunStep } from './schema';
+import { agentRun, agentRunStep, portfolio } from './schema';
 import type {
-  AgentWorkflowType,
+  AgentRunDetail,
   AgentRunRecord,
   AgentRunStepRecord,
   AgentRunStore,
+  AgentWorkflowType,
   CreateAgentRunResult,
 } from '@/lib/agents/run-store';
 
@@ -54,69 +55,24 @@ function toStepRecord(
 }
 
 export const agentRunStore: AgentRunStore = {
-  async createRun(
-    userId,
-    workflowType,
-    input,
-    idempotencyKey,
-  ): Promise<CreateAgentRunResult> {
-    const now = new Date();
-    const expiresAt = new Date(
-      now.getTime() + RUN_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  createRun(userId, workflowType, input, idempotencyKey) {
+    return createRun(userId, workflowType, input, idempotencyKey, 'manual');
+  },
+
+  createScheduledMonitoringRun(userId, portfolioId, scheduleKey, positions) {
+    return createRun(
+      userId,
+      'scheduled-monitoring',
+      { portfolioId, positions },
+      scheduleKey,
+      `portfolio:${portfolioId}`,
     );
-    return db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
-      await tx
-        .delete(agentRun)
-        .where(and(eq(agentRun.userId, userId), lte(agentRun.expiresAt, now)));
-      const [existing] = await tx
-        .select()
-        .from(agentRun)
-        .where(
-          and(
-            eq(agentRun.userId, userId),
-            eq(agentRun.idempotencyKey, idempotencyKey),
-          ),
-        )
-        .limit(1);
-      if (existing) {
-        if (
-          existing.workflowType !== workflowType ||
-          stableJson(existing.input) !== stableJson(input)
-        ) {
-          return { kind: 'conflict' as const };
-        }
-        return { kind: 'existing' as const, run: toRunRecord(existing) };
-      }
-
-      const activeRuns = await tx
-        .select({ id: agentRun.id })
-        .from(agentRun)
-        .where(
-          and(
-            eq(agentRun.userId, userId),
-            inArray(agentRun.status, ['pending', 'running']),
-            gt(agentRun.expiresAt, now),
-          ),
-        )
-        .limit(MAX_ACTIVE_RUNS_PER_USER);
-      if (activeRuns.length >= MAX_ACTIVE_RUNS_PER_USER) {
-        return { kind: 'limit' as const };
-      }
-
-      const [row] = await tx
-        .insert(agentRun)
-        .values({ userId, workflowType, idempotencyKey, input, expiresAt })
-        .returning();
-      return { kind: 'created' as const, run: toRunRecord(row) };
-    });
   },
 
   async markRunRunning(runId) {
-    const now = new Date();
     await db
       .update(agentRun)
-      .set({ status: 'running', startedAt: now, error: null })
+      .set({ status: 'running', startedAt: new Date(), error: null })
       .where(eq(agentRun.id, runId));
   },
 
@@ -138,10 +94,14 @@ export const agentRunStore: AgentRunStore = {
   },
 
   async completeStep(runId, name, result) {
-    const now = new Date();
     await db
       .update(agentRunStep)
-      .set({ status: 'completed', result, error: null, completedAt: now })
+      .set({
+        status: 'completed',
+        result,
+        error: null,
+        completedAt: new Date(),
+      })
       .where(and(eq(agentRunStep.runId, runId), eq(agentRunStep.name, name)));
   },
 
@@ -204,7 +164,7 @@ export const agentRunStore: AgentRunStore = {
     }));
   },
 
-  async getRun(userId, runId) {
+  async getRun(userId, runId): Promise<AgentRunDetail | null> {
     const [row] = await db
       .select()
       .from(agentRun)
@@ -232,3 +192,85 @@ export const agentRunStore: AgentRunStore = {
     return deleted.length;
   },
 };
+
+async function createRun(
+  userId: string,
+  workflowType: AgentWorkflowType,
+  input: Record<string, unknown>,
+  idempotencyKey: string,
+  scopeKey: string,
+): Promise<CreateAgentRunResult> {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + RUN_RETENTION_DAYS * 86400000);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+    await tx
+      .delete(agentRun)
+      .where(and(eq(agentRun.userId, userId), lte(agentRun.expiresAt, now)));
+
+    const [existing] = await tx
+      .select()
+      .from(agentRun)
+      .where(
+        and(
+          eq(agentRun.userId, userId),
+          eq(agentRun.scopeKey, scopeKey),
+          eq(agentRun.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      if (
+        existing.workflowType !== workflowType ||
+        stableJson(existing.input) !== stableJson(input)
+      ) {
+        return { kind: 'conflict' as const };
+      }
+      return { kind: 'existing' as const, run: toRunRecord(existing) };
+    }
+
+    if (workflowType === 'scheduled-monitoring') {
+      const portfolioId = input.portfolioId;
+      if (typeof portfolioId !== 'string') return { kind: 'conflict' as const };
+      const [enabledPortfolio] = await tx
+        .select({ id: portfolio.id })
+        .from(portfolio)
+        .where(
+          and(
+            eq(portfolio.id, portfolioId),
+            eq(portfolio.userId, userId),
+            eq(portfolio.monitoringEnabled, true),
+          ),
+        );
+      if (!enabledPortfolio) return { kind: 'conflict' as const };
+    }
+
+    const activeRuns = await tx
+      .select({ id: agentRun.id })
+      .from(agentRun)
+      .where(
+        and(
+          eq(agentRun.userId, userId),
+          inArray(agentRun.status, ['pending', 'running']),
+          gt(agentRun.expiresAt, now),
+        ),
+      )
+      .limit(MAX_ACTIVE_RUNS_PER_USER);
+    if (activeRuns.length >= MAX_ACTIVE_RUNS_PER_USER) {
+      return { kind: 'limit' as const };
+    }
+
+    const [row] = await tx
+      .insert(agentRun)
+      .values({
+        userId,
+        workflowType,
+        scopeKey,
+        idempotencyKey,
+        input,
+        expiresAt,
+      })
+      .returning();
+    return { kind: 'created' as const, run: toRunRecord(row) };
+  });
+}

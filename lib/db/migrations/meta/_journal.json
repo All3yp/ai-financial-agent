@@ -92,6 +92,13 @@
       "when": 1791472993031,
       "tag": "0012_portfolio_monitoring_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791473414913,
+      "tag": "0013_scoped_scheduled_run_keys",
+      "breakpoints": true
     }
   ]
 }

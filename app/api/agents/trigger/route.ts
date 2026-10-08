@@ -10,11 +10,11 @@ import {
   requestScreening,
 } from '@/lib/agents/client';
 import { readAgentRunRequest, submitAgentRun } from '@/lib/agents/run-http';
-import type { AgentWorkflowType } from '@/lib/agents/run-store';
+import type { ManualAgentWorkflowType } from '@/lib/agents/run-store';
 import { agentRunStore } from '@/lib/db/agent-runs';
 
 async function enqueueWorkflow(
-  workflowType: AgentWorkflowType,
+  workflowType: ManualAgentWorkflowType,
   input: Record<string, unknown>,
   userId: string,
   runId: string,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     const idempotencyKey = request.headers.get('Idempotency-Key') ?? '';
     return await submitAgentRun(
       session.user.id,
-      workflowType as AgentWorkflowType,
+      workflowType as ManualAgentWorkflowType,
       data,
       idempotencyKey,
       agentRunStore,

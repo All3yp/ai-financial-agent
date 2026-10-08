@@ -276,7 +276,7 @@ migrations.
 - [x] Choose queued/background execution with run ID and status polling for
   manual agent triggers; remove their duplicate synchronous execution.
 - [x] Add idempotency keys, bounded manual-run concurrency and per-user limits.
-- [ ] Extend durable status/failure handling and execution limits to scheduled
+- [ ] Extend configurable execution limits and schedule controls to scheduled
   workflows.
 - [ ] Make scheduled monitoring query only enabled, owner-authorized portfolios;
   let users configure frequency, timezone and pause/resume, and account for
@@ -284,12 +284,14 @@ migrations.
   quotas. Do not describe the current UTC weekday crons as exchange-hours aware.
 
 Portfolio CRUD includes `monitoringEnabled`, which defaults to `false`; the
-scheduled monitor now queries only opted-in owner-scoped portfolios with
-holdings. This setting is available through the authenticated portfolio API
-and import/export, but there is not yet a dashboard control. The cron remains
-the fixed `0 9-16 * * 1-5` UTC schedule; it does not honor per-user timezones,
-frequency, exchange sessions, daylight-saving transitions or holidays. Scheduled
-run history, stale-price gating and alert delivery remain unimplemented.
+scheduled monitor queries only opted-in owner-scoped portfolios with holdings.
+Each portfolio/hour run has a durable status, step result and sanitized error,
+and retries reuse its portfolio-scoped occurrence key. This setting is available
+through the authenticated portfolio API and import/export, but there is not yet
+a dashboard control. The cron remains the fixed `0 9-16 * * 1-5` UTC schedule;
+it does not honor per-user timezones, frequency, exchange sessions, daylight-
+saving transitions or holidays. Stale-price gating and alert delivery remain
+unimplemented.
 
 - [ ] Add an opt-in notification outbox with deduplication, bounded retries,
   throttling, delivery status, quiet hours and revocation. Begin with concise

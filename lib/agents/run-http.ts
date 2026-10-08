@@ -1,6 +1,6 @@
 import {
   workflowRunSchemas,
-  type AgentWorkflowType,
+  type ManualAgentWorkflowType,
   type CreateAgentRunResult,
   sanitizeRunError,
   type AgentRunStore,
@@ -84,12 +84,12 @@ export async function readAgentRunRequest(
 
 export async function submitAgentRun(
   userId: string,
-  workflowType: AgentWorkflowType,
+  workflowType: ManualAgentWorkflowType,
   input: unknown,
   idempotencyKey: string,
   store: AgentRunStore,
   enqueue: (
-    workflowType: AgentWorkflowType,
+    workflowType: ManualAgentWorkflowType,
     input: Record<string, unknown>,
     userId: string,
     runId: string,

@@ -299,9 +299,16 @@ export const agentRun = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     workflowType: varchar('workflowType', {
-      enum: ['analysis', 'debate', 'screening', 'monitoring'],
+      enum: [
+        'analysis',
+        'debate',
+        'screening',
+        'monitoring',
+        'scheduled-monitoring',
+      ],
     }).notNull(),
     idempotencyKey: varchar('idempotencyKey', { length: 128 }).notNull(),
+    scopeKey: varchar('scopeKey', { length: 128 }).notNull().default('manual'),
     status: varchar('status', {
       enum: ['pending', 'running', 'completed', 'failed'],
     })
@@ -320,7 +327,11 @@ export const agentRun = pgTable(
   (table) => ({
     ownerCreatedIdx: index().on(table.userId, table.createdAt, table.id),
     expiryIdx: index().on(table.expiresAt),
-    ownerIdempotencyUnique: unique().on(table.userId, table.idempotencyKey),
+    ownerIdempotencyUnique: unique().on(
+      table.userId,
+      table.scopeKey,
+      table.idempotencyKey,
+    ),
   }),
 );
 
