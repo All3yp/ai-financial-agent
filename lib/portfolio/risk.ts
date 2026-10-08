@@ -35,6 +35,8 @@ const scenarioSchema = z.object({
   returns: z.record(z.string().min(1), z.number().finite().min(-1)),
 }).strict();
 
+export { inputSchema as portfolioRiskInputSchema, scenarioSchema as portfolioStressScenarioSchema };
+
 export type Position = z.infer<typeof positionSchema>;
 export type PriceHistory = z.infer<typeof historySchema>;
 export type PortfolioRiskInput = z.input<typeof inputSchema>;

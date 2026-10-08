@@ -2,6 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { FinancialToolsManager } from './financial-tools';
 
+test('market and portfolio calculations are registered and validate direct calls', async () => {
+  const tools = new FinancialToolsManager({ financialData: { provider: 'auto', apiKeys: {} } }).getTools();
+  assert.equal(typeof tools.generatePortfolioReport.execute, 'function');
+  assert.equal(typeof tools.analyzeMarket.execute, 'function');
+  await assert.rejects(tools.analyzeMarket.execute({} as never));
+  await assert.rejects(tools.generatePortfolioReport.execute({} as never));
+  assert.equal(typeof tools.getSECFinancialFacts.execute, 'function');
+  assert.equal(typeof tools.getSECFilingSections.execute, 'function');
+});
+
 test('SEC discovery is available through the manager without financial provider keys', async () => {
   const manager = new FinancialToolsManager({
     financialData: { provider: 'auto', apiKeys: {} },

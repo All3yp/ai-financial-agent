@@ -148,7 +148,9 @@ the shared `FinancialDataClient`, used by chat and agent financial tools.
 ### NOT Available (Gaps):
 - SEC discovery is available through `getSECFilings`: 10-K/10-Q/8-K metadata,
   bounded historical pagination, optional amendments and official document/index
-  links. XBRL parsing and document section extraction remain unavailable.
+  links. `getSECFinancialFacts` returns validated standard XBRL observations;
+  `getSECFilingSections` extracts Business, Risk Factors and MD&A from discovered
+  10-K/10-Q HTML documents. Full statement reconstruction and OCR remain unavailable.
 - ❌ Earnings call transcripts
 - ❌ Analyst estimates/ratings
 - ❌ Insider transactions (Form 4)
@@ -199,8 +201,9 @@ Before implementing these items, resolve their concrete prerequisites:
   - [x] `getSECFilings({ ticker, formType: '10-K'|'10-Q'|'8-K', limit? })` - metadata and official links
   - [x] Historical submissions pagination and amended-form support (bounded, with coverage metadata)
   - [x] Automatic `SEC_USER_AGENT` configuration in local setup without erasing existing settings
-  - [ ] XBRL parsing for financial statements
-  - [ ] Section extraction (Risk Factors, MD&A, Business)
+  - [x] Standard company-wide XBRL observations via SEC Company Facts JSON
+  - [ ] Full financial-statement reconstruction and custom dimensional XBRL parsing
+  - [x] Section extraction (Risk Factors, MD&A, Business) for supported 10-K/10-Q HTML headings
 
 SEC discovery uses `lib/api/sec-filings.ts` and is exposed by the shared tool
 manager. `bash setup-local.sh` configures `SEC_USER_AGENT` automatically, preserving
@@ -226,7 +229,24 @@ Results merge, deduplicate by accession and sort before applying `limit`.
 `archivePagesRead`, `archivePagesAvailable` and `historyComplete` expose the
 coverage; reaching the page bound is never presented as a complete archive.
 Archive failures reject the query rather than silently returning partial data.
-This still returns discovery metadata, not filing text or parsed statements.
+Discovery still returns metadata, not filing text or parsed statements.
+
+`getSECFinancialFacts({ ticker, concepts, taxonomy?, asOf?, limitPerConcept? })`
+uses official Company Facts JSON. Supported taxonomies are `us-gaap`,
+`ifrs-full` and `dei`; exact concept names are required. Each observation retains
+unit, start/end, accession, form and filing date. `asOf` filters by disclosure
+filing date, preventing later restatements from entering an earlier query.
+Missing concepts and truncated observations are explicit. No units or YTD and
+standalone-quarter durations are combined into invented statements.
+
+`getSECFilingSections({ ticker, accessionNumber, formType, maxCharacters? })`
+downloads only the discovered primary HTML document, rejects redirects, caps
+downloads at 25 MB and extracts supported item headings with Cheerio. It removes
+scripts, styles, hidden content and table-of-contents noise. Missing sections
+remain null; text is limited per section (20,000 characters by default, at most
+50,000). Discovery is bounded to 100 matching filings and 20 archive pages.
+Unconventional headings, external CSS visibility, scanned PDFs and OCR are not
+supported. Filing text remains untrusted data, never agent instructions.
 
 - [ ] **Earnings Intelligence**
   - [ ] `getEarningsTranscripts(ticker, quarter)`
@@ -301,7 +321,18 @@ The broader checkboxes remain open because their full planned scope is not done.
 - [x] Aligned Pearson return correlations (not PCA or factor models)
 - [x] Explicit caller-supplied stress scenarios (not historical crisis replay)
 - [x] Structured deterministic risk report with warnings and limitations
-- [ ] Connect risk reports to chat/agent tools and dashboard
+- [x] Connect risk reports to chat/agent tools (`generatePortfolioReport`)
+- [x] Authenticated REST API: `POST /api/portfolio/risk`
+- [x] Local CLI: `pnpm portfolio:report input.json`
+- [ ] Dashboard risk widgets and sourced-history acquisition
+
+The shared risk tool, REST API and CLI reuse strict validation and never call
+models or generate stress scenarios. Inputs require `positions`, `histories`,
+`currency`, optional `confidence` and optional explicit `scenarios`.
+The tool limits input to 10 positions, 251 prices per history and 10 scenarios.
+HTTP/CLI additionally enforce a 1 MiB input byte limit; HTTP requires a signed-in
+user. Prices must be real sourced, same-currency and consistently adjusted.
+Provenance, FX conversion and corporate-action adjustment are caller obligations.
 
 - [ ] `calculatePortfolioRisk(positions[])` - VaR, CVaR, factor exposure
 - [ ] `optimizePortfolio(constraints)` - Mean-variance, risk parity, HRP
@@ -310,6 +341,18 @@ The broader checkboxes remain open because their full planned scope is not done.
 - [ ] `generatePortfolioReport(positions[])` - Attribution, risk decomposition
 
 ### Phase 7: Multi-Agent Market Analysis (Core Request)
+
+- [x] Deterministic historical regime indicators and sector-proxy momentum rankings (`analyzeMarket` tool)
+- [x] Configurable momentum horizons, realized volatility thresholds, common-date alignment and effective as-of reporting
+
+`lib/market/analysis.ts` accepts real dated histories, an explicit market
+benchmark and sector proxy tickers, price basis and `asOf`. Default windows use
+20/60/200 common observations and require 201 price dates. Payloads are bounded
+to 12 series of at most 501 prices. Six regime labels are descriptive threshold
+classifications, not predicted states or trading instructions. Ranking uses
+common observation dates and warns when gaps or stale common dates affect the
+result. This is a tested numerical foundation available to existing agents, not
+the complete autonomous agent team, allocation optimizer or scheduling system.
 
 - [ ] **MarketRegimeAgent** - Identifies regime (bull/bear/sideways/volatile)
 - [ ] **SectorRotationAgent** - Tracks sector momentum, rotation signals
@@ -321,6 +364,7 @@ The broader checkboxes remain open because their full planned scope is not done.
 
 ### Phase 8: Execution Modes Beyond Chat
 
+- [x] Authenticated portfolio risk REST endpoint and local report CLI (see Phase 6)
 - [ ] **Scheduled Reports** - Daily/weekly/monthly via Inngest cron
 - [ ] **Webhook Alerts** - Push to Discord/Slack/Email/Telegram
 - [ ] **API Endpoints** - REST/GraphQL for external integration
@@ -456,12 +500,15 @@ components/
 ```bash
 node --test scripts/setup-env.test.mjs
 bash -n setup-local.sh
-pnpm exec tsx --test lib/api/financial-data-config.test.ts lib/api/financial-data.test.ts lib/api/sec-filings.test.ts lib/ai/tools/financial-tools.test.ts lib/agents/research.test.ts lib/portfolio/risk.test.ts
+pnpm exec tsx --test lib/api/*.test.ts lib/ai/tools/*.test.ts lib/agents/research.test.ts lib/portfolio/*.test.ts lib/market/*.test.ts scripts/portfolio-report.test.ts
 pnpm exec tsc --noEmit --incremental false
+pnpm exec next build
 ```
 
 These checks use fixtures and do not prove live-provider entitlements, freshness,
 SEC connectivity, deployment readiness or end-to-end model execution.
+`next build` checks the application without changing the database; the existing
+`pnpm build` also runs database migrations and must use the intended database.
 
 1. **Test current system**: `pnpm dev` + `npx inngest-cli dev` → `/agents`
 2. **Run Full Analysis** on AAPL with peers MSFT, GOOGL
