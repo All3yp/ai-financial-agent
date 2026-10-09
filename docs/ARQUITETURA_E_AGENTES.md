@@ -25,6 +25,7 @@ Esta documentação inclui o `QuantitativeDashboard` atualmente integrado à aba
 | [lib/agents/quantitative.ts](../lib/agents/quantitative.ts) | Quatro especialistas determinísticos e orquestrador da equipe |
 | [lib/agents/workflows.ts](../lib/agents/workflows.ts) | Reexport compatível das funções Inngest, não um executor adicional |
 | [lib/agents/index.ts](../lib/agents/index.ts) | Entrada pública de exports de agentes/workflows |
+| [lib/agents/workflow-registry.ts](../lib/agents/workflow-registry.ts) | Catálogo central de workflows (WORKFLOW_CATALOG) e modelos por agente (AGENT_MODEL_CATALOG) |
 | [lib/agents/client.ts](../lib/agents/client.ts) | Cliente Inngest e helpers de envio de eventos |
 | [lib/agents/inngest.ts](../lib/agents/inngest.ts) | Dois crons e cinco consumidores de eventos |
 | [lib/portfolio/risk.ts](../lib/portfolio/risk.ts) | Risco de ações fixas, correlação e choques explícitos |
@@ -192,6 +193,28 @@ Para executar a fixture sintética de roteamento: `pnpm evidence-gap:evaluate`. 
 | `agent/report.requested` | `run-report-workflow` | Report independente por evento; não existe opção report no trigger HTTP |
 
 Os quatro screens diários são Quality Value, Growth at Reasonable Price, High Quality Compounders e Dividend Growers. Nomes dos presets não garantem cobertura, unidades ou desempenho. Os crons não declaram timezone: padrão UTC do Inngest, não ET. Comentários e badges “market hours/after market” não implementam timezone Eastern, horário de verão ou feriados. A consulta futura de carteiras, e-mail/push e persistência são backlog.
+
+### 5.3 Catálogo de Workflows e Modelos de Agentes
+
+O arquivo [`lib/agents/workflow-registry.ts`](../lib/agents/workflow-registry.ts) é a **fonte única de verdade** para descobrir workflows, seus gatilhos, passos e contratos. Ele exporta:
+
+- `WORKFLOW_CATALOG`: Array com 9 workflows (3 agendados, 5 manuais/evento, 1 quantitativo), cada um com `id`, `name`, `description`, `trigger`, `steps[]` (com dependências, paralelismo, templates de entrada/saída), `inputSchema`/`outputSchema` (JSON Schema), `tags`, `owner` e `estimatedDurationMs`.
+- `AGENT_MODEL_CATALOG`: Array com 11 agentes (5 tradicionais + 5 quantitativos + 1 orquestrador), cada um com `agentId`, `agentName`, `role`, `modelId`, `modelLabel`, `actuallyCallsLLM` (boolean), `description`, `contextWindow` e `expiringSoon`.
+- Funções de consulta: `getWorkflow(id)`, `getWorkflowsByTag(tag)`, `getWorkflowsByOwner(owner)`, `getWorkflowsByTriggerType(type)`, `getAgentModelInfo(agentId)`, `getAllAgentModels()`, `getLLMAgents()`, `getDeterministicAgents()`.
+
+**Resumo dos agentes tradicionais e se chamam LLM:**
+
+| Agente | Modelo | Chama LLM? |
+| --- | --- | --- |
+| Research / `research-agent` | `apodex/apodex-1.1-mini:free` | Não (determinístico) |
+| Analysis / `analysis-agent` | `thinkingmachines/inkling:free` | Sim |
+| Screener / `screener-agent` | `nvidia/nemotron-3.5-lightning:free` | Não (determinístico) |
+| Monitor / `monitor-agent` | `meta-llama/llama-3.1-8b-instruct:free` | Não (determinístico) |
+| Report / `report-agent` | `thinkingmachines/inkling-small:free` | Sim |
+
+Agentes quantitativos (`risk-agent`, `market-regime-agent`, `sector-rotation-agent`, `time-horizon-agent`, `quantitative-team-orchestrator`) são **puramente determinísticos** — sem chamadas de LLM.
+
+Os exports estão disponíveis via `lib/agents/index.ts`.
 
 ## 6. Quatro especialistas quantitativos e seu orquestrador
 

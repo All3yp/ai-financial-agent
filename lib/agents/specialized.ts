@@ -94,6 +94,9 @@ export function normalizeScreeningCriteria(
 // ============================================
 // RESEARCH AGENT - Gathers raw financial data
 // ============================================
+// NOTE: This agent executes DETERMINISTIC tool calls only (Promise.all of 5 tools).
+// The systemPrompt and modelId below are CONFIGURED but NOT INVOKED in execute().
+// They are preserved for documentation/future use if behavior changes to use LLM.
 
 export class ResearchAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
@@ -362,6 +365,9 @@ OUTPUT FORMAT:
 // ============================================
 // SCREENER AGENT - Finds investment opportunities
 // ============================================
+// NOTE: This agent executes DETERMINISTIC tool calls only (search + metrics enrichment).
+// The systemPrompt and modelId below are CONFIGURED but NOT INVOKED in execute().
+// They are preserved for documentation/future use if behavior changes to use LLM.
 
 export class ScreenerAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {
@@ -477,6 +483,9 @@ OUTPUT FORMAT:
 // ============================================
 // MONITOR AGENT - Watches for changes/alerts
 // ============================================
+// NOTE: This agent executes DETERMINISTIC tool calls only (prices + metrics checks).
+// The systemPrompt and modelId below are CONFIGURED but NOT INVOKED in execute().
+// They are preserved for documentation/future use if behavior changes to use LLM.
 
 export class MonitorAgent extends BaseAgent {
   constructor(financialDatasetsApiKey: string) {

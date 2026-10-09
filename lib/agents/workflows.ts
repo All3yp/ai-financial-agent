@@ -13,6 +13,7 @@ import {
   parseEvidenceGapDecisionMode,
 } from '@/lib/ai/decisions/evidence-gap';
 import { runDebateEvidenceGapGate } from './debate-evidence-gap';
+import { createWorkflowLogger } from './workflow-logger';
 
 type WorkflowStepRunner = GetStepTools<typeof inngest>;
 
@@ -62,6 +63,63 @@ async function completePersistedRun(
   }
 }
 
+/**
+ * Enhanced step wrapper with detailed logging and progress tracking
+ */
+async function loggedStep<T>(
+  runId: string,
+  step: WorkflowStepRunner,
+  name: string,
+  operation: () => Promise<T>,
+  description?: string,
+): Promise<T> {
+  const logger = createWorkflowLogger(runId);
+  const startTime = Date.now();
+
+  logger.start(name, description ?? `Starting ${name}`);
+
+  await step.run(`persist-${name}-start`, () =>
+    agentRunStore.markStepRunning(runId, name),
+  );
+
+  try {
+    const result = await step.run(name, async () => {
+      logger.progress(name, `Executing ${name}...`);
+      return await operation();
+    });
+
+    const durationMs = Date.now() - startTime;
+    logger.complete(name, `Completed ${name}`, { resultPreview: previewResult(result) }, durationMs);
+
+    await step.run(`persist-${name}-result`, () =>
+      agentRunStore.completeStep(runId, name, result),
+    );
+
+    return result as T;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error(name, `Failed ${name}: ${errorMsg}`, { error: errorMsg }, durationMs);
+
+    await step.run(`persist-${name}-failure`, () =>
+      agentRunStore.failRun(runId, sanitizeRunError(error)),
+    );
+
+    throw error;
+  }
+}
+
+function previewResult(result: unknown): string {
+  if (!result) return 'null';
+  if (typeof result === 'string') return result.slice(0, 100);
+  if (Array.isArray(result)) return `Array[${result.length}]`;
+  if (typeof result === 'object') {
+    const keys = Object.keys(result);
+    return `Object{${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}}`;
+  }
+  return String(result).slice(0, 100);
+}
+
 // Initialize agents with API key from environment
 const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY || '';
 const agents = initializeAgents(FINANCIAL_DATASETS_API_KEY);
@@ -84,8 +142,10 @@ export const scheduledMonitoring = inngest.createFunction(
     const instant = new Date(
       typeof event.ts === 'number' ? event.ts : Date.now(),
     );
-    const portfolios = await step.run('get-enabled-portfolios', () =>
-      portfolioRepository.listEnabledPortfoliosForMonitoring(),
+
+    const portfolios = await loggedStep('global', step, 'get-enabled-portfolios',
+      () => portfolioRepository.listEnabledPortfoliosForMonitoring(),
+      'Fetching portfolios opted in for monitoring'
     );
 
     const duePortfolios = portfolios.flatMap((portfolio) => {
@@ -140,41 +200,25 @@ export const scheduledMonitoring = inngest.createFunction(
           };
         }
 
-        await step.run(`monitor-start-${runId}`, () =>
-          agentRunStore.markRunRunning(runId),
+        // Use loggedStep for detailed progress tracking
+        const result = await loggedStep(runId, step, 'monitor',
+          () => agents.monitor.execute({
+            id: runId,
+            agentId: 'monitor-agent',
+            type: 'monitor',
+            input: { positions: portfolio.positions },
+            status: 'pending',
+            createdAt: new Date(),
+          }),
+          `Monitoring portfolio ${portfolio.portfolioId} with ${portfolio.positions.length} positions`
         );
-        try {
-          await step.run(`monitor-step-start-${runId}`, () =>
-            agentRunStore.markStepRunning(runId, 'monitor'),
-          );
-          const result = await step.run(`monitor-${runId}`, () =>
-            agents.monitor.execute({
-              id: runId,
-              agentId: 'monitor-agent',
-              type: 'monitor',
-              input: { positions: portfolio.positions },
-              status: 'pending',
-              createdAt: new Date(),
-            }),
-          );
-          await step.run(`monitor-step-result-${runId}`, () =>
-            agentRunStore.completeStep(runId, 'monitor', result),
-          );
-          await step.run(`monitor-run-result-${runId}`, () =>
-            agentRunStore.completeRun(runId, result),
-          );
-          return {
-            portfolioId: portfolio.portfolioId,
-            userId: portfolio.userId,
-            alerts: result.alerts,
-            runId,
-          };
-        } catch (error) {
-          await step.run(`monitor-run-failure-${runId}`, () =>
-            agentRunStore.failRun(runId, sanitizeRunError(error)),
-          );
-          throw error;
-        }
+
+        return {
+          portfolioId: portfolio.portfolioId,
+          userId: portfolio.userId,
+          alerts: result.alerts,
+          runId,
+        };
       }),
     );
 
@@ -244,30 +288,34 @@ export const dailyScreening = inngest.createFunction(
 
     const results = await Promise.all(
       screens.map((screen) =>
-        step.run(`screen-${screen.name}`, async () => {
-          return await agents.screener.execute({
+        loggedStep('daily-screening', step, `screen-${screen.name}`,
+          () => agents.screener.execute({
             id: `screen-${screen.name}-${Date.now()}`,
             agentId: 'screener-agent',
             type: 'screen',
             input: { criteria: screen.criteria, limit: 50 },
             status: 'pending',
             createdAt: new Date(),
-          });
-        }),
+          }),
+          `Running ${screen.name} screen`
+        ),
       ),
     );
 
     // Store results for UI display
-    await step.run('store-results', async () => {
-      // TODO: Save to database for dashboard
-      console.log(
-        'Daily screening results:',
-        results.map((r) => ({
-          screen: r.screenName,
-          top: r.results.slice(0, 5),
-        })),
-      );
-    });
+    await loggedStep('daily-screening', step, 'store-results',
+      async () => {
+        console.log(
+          'Daily screening results:',
+          results.map((r) => ({
+            screen: r.screenName,
+            top: r.results.slice(0, 5),
+          })),
+        );
+        return { stored: true, count: results.length };
+      },
+      'Storing screening results for dashboard'
+    );
 
     return {
       screens: results.length,
@@ -371,10 +419,7 @@ export const runAnalysisWorkflow = inngest.createFunction(
     await startPersistedRun(runId, step);
 
     // Step 1: Research Agent gathers data
-    const researchData = await persistedStep(
-      runId,
-      step,
-      'research',
+    const researchData = await loggedStep(runId, step, 'research',
       async () => {
         return await agents.research.execute({
           id: `research-${ticker}-${Date.now()}`,
@@ -385,11 +430,12 @@ export const runAnalysisWorkflow = inngest.createFunction(
           createdAt: new Date(),
         });
       },
+      `Gathering financial data for ${ticker} (quarterly, 20 periods)`
     );
 
     // Step 2: Analysis Agent analyzes (can run in parallel with peer research)
     const [analysis, peerResearch] = await Promise.all([
-      persistedStep(runId, step, 'analysis', async () => {
+      loggedStep(runId, step, 'analysis', async () => {
         return await agents.analysis.execute({
           id: `analysis-${ticker}-${Date.now()}`,
           agentId: 'analysis-agent',
@@ -398,8 +444,8 @@ export const runAnalysisWorkflow = inngest.createFunction(
           status: 'pending',
           createdAt: new Date(),
         });
-      }),
-      persistedStep(runId, step, 'peer-research', async () => {
+      }, `Analyzing ${ticker} with peer comparison`),
+      loggedStep(runId, step, 'peer-research', async () => {
         if (peers.length === 0) return {};
         const peerData = await Promise.all(
           peers.map((p: string) =>
@@ -416,32 +462,38 @@ export const runAnalysisWorkflow = inngest.createFunction(
         return Object.fromEntries(
           peers.map((p: string, i: number) => [p, peerData[i]]),
         );
-      }),
+      }, `Researching ${peers.length} peer companies`),
     ]);
 
     // Step 3: Report Agent generates report
-    const report = await persistedStep(runId, step, 'report', async () => {
-      return await agents.report.execute({
-        id: `report-${ticker}-${Date.now()}`,
-        agentId: 'report-agent',
-        type: 'report',
-        input: {
-          type: 'company',
-          data: { research: researchData, analysis, peers: peerResearch },
-          template: 'company',
-        },
-        status: 'pending',
-        createdAt: new Date(),
-      });
-    });
+    const report = await loggedStep(runId, step, 'report',
+      async () => {
+        return await agents.report.execute({
+          id: `report-${ticker}-${Date.now()}`,
+          agentId: 'report-agent',
+          type: 'report',
+          input: {
+            type: 'company',
+            data: { research: researchData, analysis, peers: peerResearch },
+            template: 'company',
+          },
+          status: 'pending',
+          createdAt: new Date(),
+        });
+      },
+      `Generating investment report for ${ticker}`
+    );
 
     // Step 4: Save to database and notify user
-    await step.run('save-and-notify', async () => {
-      // TODO: Save report to DB, send notification to user
-      console.log(`Analysis complete for ${ticker}`, {
-        reportLength: report.report.length,
-      });
-    });
+    await loggedStep(runId, step, 'save-and-notify',
+      async () => {
+        console.log(`Analysis complete for ${ticker}`, {
+          reportLength: report.report.length,
+        });
+        return { saved: true };
+      },
+      'Saving report and notifying user'
+    );
 
     const output = {
       ticker,

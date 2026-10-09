@@ -5,3 +5,4 @@ export * from './specialized';
 export * from './quantitative';
 export * from './client';
 export * from './inngest';
+export * from './workflow-registry';

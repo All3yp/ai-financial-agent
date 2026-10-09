@@ -45,4 +45,5 @@ yarn-error.log*
 .save.txt
 
 quantitative*.json
-.tasks/
+.tasks/*.md
+.tasks/TODO.md
