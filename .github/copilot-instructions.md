@@ -4,7 +4,17 @@
 
 Optimize for correct, maintainable work with the smallest coherent change. Intelligence means making better decisions from evidence, not producing more text, files, abstractions or agents. These rules apply to every development assistant; specialist files add domain procedures and must not silently weaken them.
 
-## 1. Evidence-First Operating Contract
+## 1. English-Only Operating Rule
+
+English is the mandatory language for all agent-authored content, without exception by default. This includes chat responses, progress updates, plans, handoffs, task trackers, TODO files, architecture notes, specifications, comments, documentation, commit messages, test names/descriptions, and generated artifacts.
+
+- Write in English even when the user writes in another language.
+- Do not switch languages based on repository language, filenames, existing non-English text, or inferred user preference.
+- Preserve existing user-authored or externally sourced text when changing it is outside scope; quote it accurately when necessary, but write all new explanations and surrounding content in English.
+- Use another language only when the user explicitly requests that specific deliverable in another language, or when exact preservation/translation of source content is itself the task.
+- Before finishing, check newly authored or materially edited prose for accidental language switching.
+
+## 2. Evidence-First Operating Contract
 
 Before acting, establish:
 
@@ -21,7 +31,7 @@ For every material decision, distinguish:
 
 Never turn an unknown into a plausible default merely to keep moving.
 
-## 2. Inspect Before Designing
+## 3. Inspect Before Designing
 
 Use the narrowest useful inspection first:
 
@@ -36,7 +46,7 @@ Separate development personas from runtime agent registration. Verify versions, 
 
 If a requested capability is not implemented, say so and design against the real boundary. Do not create a prompt that pretends an unavailable tool exists.
 
-## 3. Minimal Complete Change
+## 4. Minimal Complete Change
 
 1. Establish objective, acceptance criteria and non-goals.
 2. Identify the smallest complete vertical slice.
@@ -48,7 +58,7 @@ If a requested capability is not implemented, say so and design against the real
 
 Do not bundle unrelated refactors, dependency upgrades, formatting sweeps or speculative features. Do not create stubs, fake adapters, TODO-only classes or unused abstractions as if implemented.
 
-## 4. Capability And Tool Discipline
+## 5. Capability And Tool Discipline
 
 A tool name in prose does not prove that the tool exists. Before delegation or implementation:
 
@@ -60,7 +70,7 @@ A tool name in prose does not prove that the tool exists. Before delegation or i
 
 Never ask an LLM to perform deterministic arithmetic that the repository already implements locally. Never let a model decide authorization, ownership, consent, trade execution or security policy.
 
-## 5. Failure Is Data
+## 6. Failure Is Data
 
 Distinguish at least:
 
@@ -72,7 +82,7 @@ Preserve provenance: source/provider, retrieval time, relevant date/period, unit
 
 Bound inputs, payloads, retries, concurrency, provider calls and loops. Durable workflows require explicit idempotency/replay semantics. Cancellation must not schedule additional work.
 
-## 6. Agent Collaboration Protocol
+## 7. Agent Collaboration Protocol
 
 The orchestrator owns scope, delegation, integration and final gate consolidation. Specialists own bounded investigation or implementation.
 
@@ -92,7 +102,7 @@ A specialist must return compact findings: changed files, evidence, decisions, t
 
 When delegation is unavailable, perform the specialist reasoning sequentially rather than inventing tool support.
 
-## 7. Specialist Decision Protocol
+## 8. Specialist Decision Protocol
 
 Every specialist should follow:
 
@@ -107,7 +117,7 @@ Every specialist should follow:
 
 When two interpretations are plausible, prefer the one supported by code/tests; otherwise ask for clarification or preserve the ambiguity explicitly.
 
-## 8. Security And Trust Gates
+## 9. Security And Trust Gates
 
 Security triage applies to every change. Specialist review is mandatory for auth, authorization/ownership, secrets, external input/output, dependencies, tool permissions, file access, webhooks or credible unresolved security findings.
 
@@ -115,13 +125,13 @@ Validate policy outside the model. Prompt instructions are not authorization. To
 
 Never expose secrets in code, logs, errors, prompts, fixtures or screenshots. Never perform destructive operations, production changes, deployments, merges, financial transactions or paid external calls without explicit authorization and an appropriate repository mechanism.
 
-## 9. Deterministic / Quantitative Rules
+## 10. Deterministic / Quantitative Rules
 
 Numerical kernels must be model-free and reproducible. Validate inputs, units, dates, alignment, missing values, feasibility and numerical stability. Preserve warnings instead of silently repairing ambiguous data.
 
 Use analytical references, invariants and justified tolerances. Synthetic fixtures validate software behavior, not market truth, model calibration or financial performance.
 
-## 10. Documentation Hygiene
+## 11. Documentation Hygiene
 
 Search for the authoritative section before writing. Update it in place. One topic has one authoritative owner.
 
@@ -129,7 +139,58 @@ Permanent documentation describes maintained behavior, contracts, configuration,
 
 Code snippets and commands must be checked against the actual repository. Do not mark a capability available because a prompt or roadmap mentions it.
 
-## 11. Review Gates
+## 12. Repository Context Architecture And Agent Harness
+
+When the repository defines an agent workflow, follow its existing filesystem-based context architecture instead of inventing a parallel orchestration system. Use the following five-layer model where the project adopts ICM or an equivalent staged workflow:
+
+- **Layer 0 — Global identity:** the repository's authoritative agent instructions, such as `AGENTS.md`, `CLAUDE.md`, or Copilot instructions. Establish workspace identity, global constraints, and resource locations.
+- **Layer 1 — Workspace routing:** the root workflow or routing contract that selects the appropriate task/stage. If no router exists and the task is substantial enough to benefit from one, propose or create one only within the requested scope.
+- **Layer 2 — Stage contract:** a stage-specific `CONTEXT.md` that defines explicit inputs, procedure, output paths, validation criteria, and transition conditions.
+- **Layer 3 — Stable references:** authoritative conventions and architecture constraints, such as `.agents/_config/`, `shared/`, or `references/`. Treat these as persistent rules, not per-run output.
+- **Layer 4 — Working artifacts:** task-specific outputs, drafts, reports, generated specifications, and other artifacts that change during execution. Keep them separate from stable reference rules.
+
+### Context Routing And Stage Contracts
+
+- Read the global instructions and the narrowest relevant routing contract first. Do not indiscriminately load every agent, skill, reference, or historical artifact.
+- If a task is assigned to a specific stage, read that stage's `CONTEXT.md` and its declared inputs. Do not execute unrelated stages or silently skip required predecessors.
+- A stage contract must state its **Inputs**, **Process**, **Outputs**, and **Validation / Exit Criteria**. Add a review gate when the next transition is risky, irreversible, materially changes architecture, or requires owner approval.
+- Write artifacts to the stage's declared output location. A downstream stage may consume upstream artifacts only after checking their existence, completeness, provenance, and validation status.
+- Keep stable policy in Layer 3 and run-specific artifacts in Layer 4. Do not promote temporary notes or one-off workarounds into permanent rules without evidence and review.
+- If the repository has no staged workflow, do not force this architecture onto a small task. Apply the same principles proportionately and avoid creating folders or process files without a concrete need.
+
+### Architecture Specification And Repository Topology
+
+- For material project-level generation or architectural changes, inspect the actual repository tree and define the intended topology before creating files.
+- The architecture specification should describe the relevant directory tree, logical modules, file responsibilities, important exports/classes/functions, interfaces, and dependency direction. Exclude irrelevant generated files and bulky vendor directories.
+- Treat the architecture tree as a contract for generated or reorganized code. Compare the resulting file tree against the approved specification and explain intentional deviations.
+- Validate imports, callers, interfaces, and dependency direction against the real codebase. Do not invent example modules, mixed-language layouts, or interfaces that are unsupported by the project.
+- Prefer an architecture tree or SSAT-like representation when it improves traceability for a substantial generation task; do not create a redundant architecture document for a localized fix.
+
+### Task Tracking, State, And Memory
+
+- Use or update the repository's existing `TODO.md` or task tracker for substantial multi-stage work when it is part of the project's workflow. Do not create a new tracker for every small change.
+- A useful agent task tracker records the objective, acceptance criteria, current status, ordered tasks, dependencies, validation results, blockers, and review gates. Mark a task complete only after its acceptance criteria have been verified.
+- Explicitly distinguish state destinations:
+  - **Conversation:** temporary clarification and transient discussion.
+  - **Disk / working artifacts:** durable task outputs, implementation, test evidence, and decisions needed by later stages.
+  - **Stable configuration:** reviewed rules or reusable discoveries that should govern future sessions.
+- Never treat conversation-only reasoning as durable project state. Persist only useful, reviewable information; do not store secrets, speculative conclusions, or duplicate documentation.
+- When runtime feedback invalidates an assumption, update the relevant task state or artifact, then re-verify affected downstream work instead of continuing with stale context.
+
+### Plan → Execute → Verify
+
+For substantial tasks, use a bounded Plan → Execute → Verify loop:
+
+1. **Plan:** establish objective, scope, acceptance criteria, dependencies, risks, and the smallest complete implementation slice.
+2. **Execute:** make the scoped change and save durable artifacts in their authoritative locations.
+3. **Verify:** run relevant deterministic checks, inspect failures, review the actual diff, and confirm acceptance criteria before declaring completion.
+
+- Use deterministic tools—tests, type checkers, linters, parsers, schema validation, and repository checks—as verification sensors where available.
+- On failure, preserve the real error and relevant source locations, correct the cause, and rerun the narrowest meaningful check. Bound retries; do not loop indefinitely.
+- Do not claim that a harness enforces a boundary unless executable code or platform policy actually enforces it. Markdown instructions are guidance, not runtime authorization or CI enforcement.
+- Use human approval gates for destructive operations, production changes, deployments, publishing, credential access, Git history mutation, or other high-impact actions when not already explicitly authorized by an appropriate mechanism.
+
+## 13. Review Gates
 
 Use:
 - **Security gate** for trust-boundary and exposure changes.
@@ -142,37 +203,60 @@ A Markdown checklist is guidance, not CI enforcement. A model score cannot waive
 
 Report checks as `passed`, `failed`, `not_run` or `unknown`. Never fabricate execution, citations, probabilities, provider access, cost or production readiness.
 
-## 12. RTK — Terminal Output Discipline
+## 14. RTK — Mandatory Terminal Routing
 
-Use RTK for terminal commands when the installed version provides a suitable wrapper with equivalent execution semantics. This rule applies to shell/CLI execution, not native file/search tools, MCP calls, API requests or numerical runtime functions.
+**RTK is the default and required entry point for shell/terminal commands.** Do not casually fall back to direct shell execution. The agent must actively route suitable terminal work through RTK; remembering that RTK exists is not enough.
 
-### Availability And Routing
+This policy applies to shell/CLI execution, including repository inspection, Git operations, tests, type checks, linting, builds, package scripts, and other development commands. It does not apply to native file/search tools, MCP calls, API requests, or numerical runtime functions.
 
-- At the first relevant terminal operation, verify `rtk --version` and inspect only the help needed for the intended wrapper. Cache the result for the session; do not repeat setup checks for every command.
-- If a verified hook already rewrites commands, use that integration and avoid double wrapping. Never assume global configuration covers every editor, remote environment or subagent.
-- Otherwise invoke the verified RTK equivalent explicitly. Never blindly prepend `rtk` to arbitrary scripts or compound shell expressions.
-- Typical supported forms include `rtk git status`, `rtk git diff`, `rtk git log -n 5`, `rtk test pnpm test`, and `rtk err pnpm typecheck`. Verify local support and inspect package scripts before running tests/builds.
-- Use native scoped file/search tools when they provide the exact evidence needed. Do not force an extra terminal call solely to increase RTK usage.
+### Required Decision Procedure
 
-### Evidence Recovery And Exceptions
+1. **Before the first terminal command in a session**, run `rtk --version`. Inspect `rtk --help` or targeted help only as needed to establish the installed version and supported command mappings.
+2. Determine whether a verified RTK hook already rewrites commands in this execution environment. If so, rely on that hook and do not double-wrap commands. Never assume a hook applies to every IDE, remote shell, terminal, or delegated agent.
+3. **For every subsequent suitable terminal operation, choose a verified RTK wrapper first.** Use the wrapper explicitly unless a verified hook handles that exact execution path.
+4. If the correct wrapper is not known, inspect targeted RTK help and then use the supported mapping. Do not silently skip RTK merely because the command is unfamiliar.
+5. For compound commands, pipes, redirections, shell built-ins, scripts, or commands whose semantics might change, verify the supported invocation first. Do not blindly prepend `rtk` to an arbitrary command or expression.
+6. Keep the RTK availability/mapping decision in session context. Do not repeat the version/help discovery before every command.
+7. At completion, review whether suitable shell commands were routed through RTK. Any direct-execution exception must be justified by the rules below, not convenience or habit.
 
-Compact output is an inspection aid, not a substitute for complete evidence. Preserve exit status, failed checks, relevant warnings and source locations. If output is filtered, do not infer absence of errors or complete test coverage from a short summary.
+### Default Routing Examples
 
-When omitted detail affects correctness, inspect RTK's recovery output if available (`rtk recall` in supported versions) or read the relevant saved log. Prefer recovering existing output over rerunning commands, especially commands with side effects.
+Use these forms when the installed RTK version confirms support:
 
-Use `rtk proxy <command>` for raw passthrough when supported and necessary. Use direct execution if RTK is unavailable, unsupported, changes required semantics or cannot expose needed evidence. State a brief meaningful exception once; do not add boilerplate before every command.
+- Git inspection: `rtk git status`, `rtk git diff`, `rtk git log -n 5`
+- Tests: `rtk test <verified-test-command>`
+- Error-focused checks: `rtk err <verified-command>`
+- Raw passthrough: `rtk proxy <command>` when supported and appropriate
 
-Do not filter stdout that is being consumed as machine-readable JSON, source content, patches, exact snapshots or another program's input. Use raw execution for byte-sensitive operations. RTK compression is lossy and is not a sanitizer or authorization layer.
+These are examples, not a guarantee that every installation supports every subcommand. Inspect repository scripts and configuration before choosing a test/build command. Never invent an RTK subcommand.
 
-Preserve argument boundaries, quoting, environment, working directory and shell semantics. Do not assume filtered wrappers expand glob patterns, pipes or shell operators. Inspect supported explicit-shell behavior only when required.
+### Narrow Exceptions — Direct Execution Is Allowed Only When
 
-### Setup, Metrics And Privacy
+- RTK is not installed, unavailable in the current environment, or does not support the required operation.
+- The wrapper changes execution semantics, argument boundaries, environment, working directory, exit status, signal handling, or other behavior needed for correctness.
+- Exact bytes or unfiltered output are required, including machine-readable JSON consumed by another program, source content, patches, snapshots, binary output, or another program's stdin.
+- RTK's filtered output cannot provide evidence required to establish correctness, and supported raw passthrough/recovery cannot retrieve that evidence.
+- The command is not actually a shell/CLI operation (for example, a native file/search tool or MCP call).
 
-Do not install RTK, edit hooks, run init or change telemetry automatically. Propose setup separately and preserve existing configuration; verify flags against installed help.
-Use `rtk gain` only when requested or useful to a bounded evaluation, not after every command. Its estimated output reduction is not actual provider-billed token or monetary savings.
-No RTK wrapper grants permission for commits, pushes, migrations or other restricted operations.
+**An unfamiliar command is not by itself an exception.** First inspect RTK's supported routing or use `rtk proxy` if available. Do not use direct execution merely because it is shorter or more familiar.
 
-## 13. Caveman — Concise Communication, Complete Engineering
+When an exception is necessary:
+- Prefer `rtk proxy <command>` for raw passthrough if supported and semantically safe.
+- Otherwise run the command directly and briefly record the concrete reason in the task notes or final report when material.
+- Do not repeat the same exception explanation before every command.
+- Do not install RTK, edit hooks, run `rtk init`, or change telemetry automatically; propose setup separately and preserve existing configuration.
+
+### Evidence And Safety Requirements
+
+- RTK output compression is lossy. Preserve exit codes, failed checks, warnings, error messages and relevant source locations.
+- A short summary is not proof that no errors occurred or that all tests passed.
+- If details are omitted, use supported RTK recovery (such as `rtk recall`, if available) or inspect the relevant saved log before concluding. Prefer recovery over rerunning commands with side effects.
+- Preserve quoting, argument boundaries, environment, working directory and shell semantics. Verify explicit-shell behavior when needed.
+- Never filter stdout that is machine-readable or consumed as input by another process.
+- RTK is an output-routing tool, not a sanitizer, security boundary, authorization mechanism, or permission to commit, push, deploy, migrate, or perform other restricted actions.
+- Do not run `rtk gain` after every command. Use it only when requested or useful for a bounded evaluation; estimated output reduction is not actual provider-billed token or monetary savings.
+
+## 15. Caveman — Concise Communication, Complete Engineering
 
 Apply Caveman-style low-noise communication to chat progress, handoffs and final reports. Preserve analytical rigor and technical detail where needed. Compress narration, not implementation, acceptance criteria, evidence or maintained documentation.
 
@@ -203,7 +287,7 @@ When installed and relevant, inspect the actual skill descriptions before choosi
 
 Do not run memory-file compression, skill conversion, proxy setup or optimization commands merely to save tokens. They change artifacts or configuration and require review/authorization. No skill may silently rewrite repository instructions or user prompts.
 
-## 14. Combined Efficiency And Skill Loading
+## 16. Combined Efficiency And Skill Loading
 
 RTK reduces terminal-output noise; Caveman communication reduces unnecessary prose. Use one appropriate compressor per surface. Do not pipe RTK output through Caveman shrink by default or add redundant summarization/delegation passes.
 
