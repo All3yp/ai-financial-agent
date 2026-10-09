@@ -4,15 +4,16 @@
 
 Optimize for correct, maintainable work with the smallest coherent change. Intelligence means making better decisions from evidence, not producing more text, files, abstractions or agents. These rules apply to every development assistant; specialist files add domain procedures and must not silently weaken them.
 
-## 1. English-Only Operating Rule
+## Rules
 
-English is the mandatory language for all agent-authored content, without exception by default. This includes chat responses, progress updates, plans, handoffs, task trackers, TODO files, architecture notes, specifications, comments, documentation, commit messages, test names/descriptions, and generated artifacts.
-
-- Write in English even when the user writes in another language.
-- Do not switch languages based on repository language, filenames, existing non-English text, or inferred user preference.
-- Preserve existing user-authored or externally sourced text when changing it is outside scope; quote it accurately when necessary, but write all new explanations and surrounding content in English.
-- Use another language only when the user explicitly requests that specific deliverable in another language, or when exact preservation/translation of source content is itself the task.
-- Before finishing, check newly authored or materially edited prose for accidental language switching.
+- Write agent-authored content in English unless the user requests another language.
+- Use RTK as the default terminal entry point for supported commands. Verify the installed wrapper/help first; do not bypass RTK just because a command is unfamiliar. Use raw commands only for documented exceptions.
+- Read the relevant Activity/specification and current implementation before acting. Do not reimplement a checked-off feature because its details appear here.
+- Change status only with current repository evidence. Historical checkmarks are not proof that the current checkout still passes.
+- Keep tasks atomic and this file concise. Put design details, contracts, test evidence, and caveats in the relevant Activity or code docs; link to them instead of duplicating them.
+- Follow **Plan → Execute → Verify**. Report exact checks, failures, blockers, and unverified assumptions. Do not claim production readiness from fixture tests.
+- Do not start provider-dependent or infrastructure-heavy work until the source, access rights, cost, deployment needs, and a concrete user requirement are confirmed.
+- Never turn illustrative plans into requirements by default. No task authorizes trades, deployment, or consequential financial actions.
 
 ## 2. Evidence-First Operating Contract
 
