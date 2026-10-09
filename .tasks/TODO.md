@@ -62,7 +62,20 @@ Prompt execution caveat verified in `lib/agents/specialized.ts`: `AnalysisAgent`
 - Commit completed task changes. Keep commit subjects direct and concise (one line, at most two short phrases); do not include unrelated user changes.
 - Keep the final completion summary to at most two direct sentences.
 
-## Outstanding Dependency Warnings
+---
+
+## ✅ Completed Activities (Verified)
+
+- **Activity 01** — Local Copilot agents audit, project-review contracts, 14 agents validated. See `.tasks/01-copilot-agent-review.md`
+- **Activity 02** — Deterministic evidence-gap checking for debate workflow (default-off), bounded contracts, persisted decisions, tests, synthetic evaluator. See `.tasks/02-financial-decision-support.md`
+
+---
+
+## 📋 Backlog (Not Started)
+
+All items below are backlog — not implemented, not validated. Implement only after prerequisites satisfied.
+
+### Outstanding Dependency Warnings
 
 - [ ] Resolve package-manager deprecation and peer warnings through scoped compatibility upgrades; validate each affected workflow before marking complete. Observed warnings: deprecated `eslint@8.57.1` with `eslint-config-next@14.2.5`; deprecated `inngest@3.28.0`; deprecated `drizzle-kit@0.25.0` transitive `@esbuild-kit/core-utils@3.3.2` and `@esbuild-kit/esm-loader@2.6.5`; other deprecated transitive packages reported by pnpm (`@humanwhocodes/*`, `acorn-import-assertions`, `glob@7.2.3`, `inflight`, `node-domexception`, `rimraf@3`, `serialize-error-cjs`, `whatwg-encoding`); OpenTelemetry peer mismatch (`@opentelemetry/api@1.9.0` versus `sdk-logs@0.46.0` / core/resources requiring `<1.8.0`); Zod peer mismatch (`zod@3.22.4` versus `openai@4.96.0` and `zod-to-json-schema@3.24.5`). Do not bundle major Inngest, ESLint/Next, Drizzle, OpenTelemetry or schema upgrades into unrelated feature work.
 
