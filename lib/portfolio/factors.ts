@@ -169,7 +169,8 @@ export function analyzePortfolioFactors(input: PortfolioFactorsInput): Portfolio
     ],
   };
   if (parsed.portfolioWeights) {
-    const weights = Object.fromEntries(tickers.map((ticker) => [ticker, parsed.portfolioWeights![ticker]]));
+    const weightsRecord = parsed.portfolioWeights;
+    const weights = Object.fromEntries(tickers.map((ticker) => [ticker, weightsRecord[ticker]]));
     const dailyReturns = assets[0].returns.map((_, index) =>
       sum(assets.map(({ ticker, returns }) => finite(weights[ticker] * returns[index]))));
     result.portfolio = { model: 'static-weights-daily-rebalanced', weights, dailyReturns };

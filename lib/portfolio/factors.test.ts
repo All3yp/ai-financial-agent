@@ -57,7 +57,7 @@ test('ticker, factor and observation permutations preserve exact outputs and can
   const expected = analyzePortfolioFactors(input);
   assert.deepEqual(analyzePortfolioFactors({ ...input, histories: reverse(input.histories), factorHistories: reverse(input.factorHistories) }), expected);
   assert.deepEqual(expected.tickers, ['AAA', 'BBB']);
-  assert.deepEqual(expected.regression!.factorNames, ['X', 'Y']);
+  assert.deepEqual(expected.regression?.factorNames, ['X', 'Y']);
   for (const component of expected.components) {
     const values = Object.values(component.loadings);
     const largest = Math.max(...values.map(Math.abs));
@@ -68,25 +68,28 @@ test('ticker, factor and observation permutations preserve exact outputs and can
 test('exact portfolio factor replication gives beta one, zero intercept and R2 one', () => {
   const replicated = first.map((value, index) => 0.25 * value + 0.75 * second[index]);
   const result = analyzePortfolioFactors({ ...fixture(), portfolioWeights: { AAA: 0.25, BBB: 0.75 }, factorHistories: [history('Replication', replicated)], periodsPerYear: 365 });
-  near(result.regression!.betas.Replication, 1);
-  near(result.regression!.interceptDaily, 0);
-  near(result.regression!.rSquared, 1);
-  near(result.regression!.residualAnnualizedVolatility, 0);
-  assert.equal(result.portfolio!.model, 'static-weights-daily-rebalanced');
-  result.portfolio!.dailyReturns.forEach((value, index) => near(value, replicated[index]));
+  const regression = result.regression!;
+  const portfolio = result.portfolio!;
+  near(regression.betas.Replication, 1);
+  near(regression.interceptDaily, 0);
+  near(regression.rSquared, 1);
+  near(regression.residualAnnualizedVolatility, 0);
+  assert.equal(portfolio.model, 'static-weights-daily-rebalanced');
+  portfolio.dailyReturns.forEach((value, index) => near(value, replicated[index]));
   const prices = fixture().histories.map(({ prices }) => prices);
   const fixedShareReturn = (0.25 * prices[0][2].price + 0.75 * prices[1][2].price) / (0.25 * prices[0][1].price + 0.75 * prices[1][1].price) - 1;
-  assert.ok(Math.abs(fixedShareReturn - result.portfolio!.dailyReturns[1]) > 1e-6);
+  assert.ok(Math.abs(fixedShareReturn - portfolio.dailyReturns[1]) > 1e-6);
   assert.equal(result.periodsPerYear, 365);
 });
 
 test('multiple factors recover slopes and a daily intercept', () => {
   const response = first.map((value, index) => 0.003 + 0.5 * value - 0.25 * second[index]);
   const result = analyzePortfolioFactors({ histories: [history('A', response), history('B', second)], portfolioWeights: { A: 1, B: 0 }, factorHistories: [history('F1', first), history('F2', second)] });
-  near(result.regression!.betas.F1, 0.5);
-  near(result.regression!.betas.F2, -0.25);
-  near(result.regression!.interceptDaily, 0.003);
-  near(result.regression!.rSquared, 1);
+  const regression = result.regression!;
+  near(regression.betas.F1, 0.5);
+  near(regression.betas.F2, -0.25);
+  near(regression.interceptDaily, 0.003);
+  near(regression.rSquared, 1);
 });
 
 test('nonzero residual volatility and R2 match an independent analytic regression', () => {
@@ -98,11 +101,12 @@ test('nonzero residual volatility and R2 match an independent analytic regressio
       histories: [history('A', response), history('B', factor)],
       portfolioWeights: { A: 1, B: 0 }, factorHistories: [history('F', factor)], periodsPerYear,
     });
-    near(result.regression!.betas.F, 0.5);
-    near(result.regression!.interceptDaily, 0.003);
-    near(result.regression!.rSquared, 0.005 ** 2 / (0.005 ** 2 + 0.004 ** 2));
-    near(result.regression!.residualAnnualizedVolatility, Math.sqrt(24 * 0.004 ** 2 / 22 * periodsPerYear));
-    assert.equal(result.regression!.residualDegreesOfFreedom, 22);
+    const regression = result.regression!;
+    near(regression.betas.F, 0.5);
+    near(regression.interceptDaily, 0.003);
+    near(regression.rSquared, 0.005 ** 2 / (0.005 ** 2 + 0.004 ** 2));
+    near(regression.residualAnnualizedVolatility, Math.sqrt(24 * 0.004 ** 2 / 22 * periodsPerYear));
+    assert.equal(regression.residualDegreesOfFreedom, 22);
   }
 });
 
@@ -115,10 +119,11 @@ test('all five independent factors are regressed without truncation', () => {
     histories: [history('A', response), history('B', patterns[0])], portfolioWeights: { A: 1, B: 0 },
     factorHistories: patterns.map((pattern, index) => history(`F${index}`, pattern)),
   });
-  for (let index = 0; index < 5; index += 1) near(result.regression!.betas[`F${index}`], (index + 1) / 10);
-  near(result.regression!.interceptDaily, 0.002);
-  near(result.regression!.rSquared, 1);
-  assert.equal(result.regression!.residualDegreesOfFreedom, 26);
+  const regression = result.regression!;
+  for (let index = 0; index < 5; index += 1) near(regression.betas[`F${index}`], (index + 1) / 10);
+  near(regression.interceptDaily, 0.002);
+  near(regression.rSquared, 1);
+  assert.equal(regression.residualDegreesOfFreedom, 26);
 });
 
 test('zero-variance portfolio regression rejects undefined R2', () => {
