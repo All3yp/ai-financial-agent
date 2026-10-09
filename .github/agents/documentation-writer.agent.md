@@ -17,12 +17,12 @@ Senior technical writer. Owns the `docs/` folder. Produces concise, accurate, ex
 ## Docs Inventory
 | File | Purpose | Update Trigger |
 |------|---------|----------------|
-| `ARQUITETURA_E_AGENTES.md` | **Authoritative technical reference** — architecture, auth, chat flow, 5 LLM agents, quantitative team, limitations | Any architecture change, new agent, new tool, boundary change |
-| `GUIA_DO_USUARIO.md` | User guide: setup, env, chat usage, agent workflows, quantitative dashboard, CLI | New user-facing feature, CLI change, workflow change |
-| `PROVEDORES_DE_DADOS.md` | Data provider comparison, integration status, selection criteria | New provider, provider change, field mapping change |
+| `AGENT_ARCHITECTURE.md` | **Authoritative technical reference** — architecture, auth, chat flow, 5 LLM agents, quantitative team, limitations | Any architecture change, new agent, new tool, boundary change |
+| `USER_GUIDE.md` | User guide: setup, env, chat usage, agent workflows, quantitative dashboard, CLI | New user-facing feature, CLI change, workflow change |
+| `DATA_PROVIDERS.md` | Data provider comparison, integration status, selection criteria | New provider, provider change, field mapping change |
 | `.tasks/TODO.md` | Implementation backlog with verified progress checkboxes | Milestone completion, priority change, new initiative |
-| `VALIDACAO.md` | Validation guidelines | Process change |
-| `exemplos/` | Example files (JSON, CLI output) | New example needed |
+| `VALIDATION.md` | Validation guidelines | Process change |
+| `examples/` | Example files (JSON, CLI output) | New example needed |
 
 ## Writing Principles
 1. **Concise** — every sentence earns its keep; delete fluff
@@ -32,20 +32,20 @@ Senior technical writer. Owns the `docs/` folder. Produces concise, accurate, ex
 5. **Actionable** — user can *do* something after reading
 
 ## Content Standards
-### Architecture Doc (`ARQUITETURA_E_AGENTES.md`)
+### Architecture Doc (`AGENT_ARCHITECTURE.md`)
 - Mermaid diagrams for data flow
 - Table: LLM agents vs Quantitative agents (execution, triggers, persistence)
 - Tool registry with input/output types
 - Limitations section (honest about gaps)
 
-### User Guide (`GUIA_DO_USUARIO.md`)
+### User Guide (`USER_GUIDE.md`)
 - Prerequisites → Install → Configure → Run → Use
 - Chat: models, providers, tools, attachments
 - Agent workflows: when to use each, triggers
 - Quantitative dashboard: inputs, outputs, interpretation
 - CLI: `pnpm tsx scripts/agent-analyze.ts` examples
 
-### Data Providers (`PROVEDORES_DE_DADOS.md`)
+### Data Providers (`DATA_PROVIDERS.md`)
 - Table: Provider × Capability (prices, fundamentals, SEC, macro, news)
 - Status: Integrated / Partial / Planned / Deprecated
 - Selection logic in `financial-data-config.ts`
@@ -65,10 +65,10 @@ Code Change → Identify Affected Docs → Update Before/With PR → Review in P
 - **Cross-reference** — link between docs (e.g., Roadmap → Architecture)
 
 ## Code-Doc Synchronization
-- Tool definitions → `ARQUITETURA_E_AGENTES.md` tool table
-- Agent capabilities → `ARQUITETURA_E_AGENTES.md` agent table
-- API routes → `GUIA_DO_USUARIO.md` CLI examples
-- Schema changes → `ARQUITETURA_E_AGENTES.md` data model
+- Tool definitions → `AGENT_ARCHITECTURE.md` tool table
+- Agent capabilities → `AGENT_ARCHITECTURE.md` agent table
+- API routes → `USER_GUIDE.md` CLI examples
+- Schema changes → `AGENT_ARCHITECTURE.md` data model
 
 ## When to Engage
 - Every PR with user-facing or architectural change

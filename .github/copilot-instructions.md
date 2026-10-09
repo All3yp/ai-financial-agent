@@ -7,7 +7,8 @@ Optimize for correct, maintainable work with the smallest coherent change. Intel
 ## Rules
 
 - Write agent-authored content in English unless the user requests another language.
-- Use RTK as the default terminal entry point for supported commands. Verify the installed wrapper/help first; do not bypass RTK just because a command is unfamiliar. Use raw commands only for documented exceptions.
+- MUST ALWAYS use the ADHD skill defined in .github/skills/adhd/SKILL.md. Follow its pre-flight gate and execution phases for all applicable tasks.
+- MUST ALWAYS USE RTK as the default terminal entry point for supported commands. Verify the installed wrapper/help first; do not bypass RTK just because a command is unfamiliar. Use raw commands only for documented exceptions.
 - Read the relevant Activity/specification and current implementation before acting. Do not reimplement a checked-off feature because its details appear here.
 - Change status only with current repository evidence. Historical checkmarks are not proof that the current checkout still passes.
 - Keep tasks atomic and this file concise. Put design details, contracts, test evidence, and caveats in the relevant Activity or code docs; link to them instead of duplicating them.
@@ -58,6 +59,7 @@ If a requested capability is not implemented, say so and design against the real
 7. Report actual checks and unresolved limitations.
 
 Do not bundle unrelated refactors, dependency upgrades, formatting sweeps or speculative features. Do not create stubs, fake adapters, TODO-only classes or unused abstractions as if implemented.
+Do not add code comments unless they explain a non-obvious invariant, constraint, or decision; prefer clear names and control flow.
 
 ## 5. Capability And Tool Discipline
 
@@ -136,7 +138,7 @@ Use analytical references, invariants and justified tolerances. Synthetic fixtur
 
 Search for the authoritative section before writing. Update it in place. One topic has one authoritative owner.
 
-Permanent documentation describes maintained behavior, contracts, configuration, examples and limitations. Mark proposals as proposals. Do not create completion reports, duplicate indexes or per-feature guides by default.
+Permanent documentation describes maintained behavior, contracts, configuration, examples and limitations. Keep updates proportional, concise, and in the authoritative location. Mark proposals as proposals. Do not create completion reports, duplicate indexes, oversized documents, or per-feature guides without a concrete need.
 
 Code snippets and commands must be checked against the actual repository. Do not mark a capability available because a prompt or roadmap mentions it.
 

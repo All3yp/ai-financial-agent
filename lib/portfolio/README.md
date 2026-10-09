@@ -5,7 +5,7 @@ system. All calculations are local arithmetic with existing Zod validation. No
 paid services, credentials or model calls are required by the core calculations.
 The caller supplies prices and scenarios. The core is now integrated with a
 shared tool, authenticated REST endpoint, local CLI and quantitative dashboard;
-see the [user guide](../../docs/GUIA_DO_USUARIO.md) for current workflows.
+see the [user guide](../../docs/USER_GUIDE.md) for current workflows.
 
 ## API
 

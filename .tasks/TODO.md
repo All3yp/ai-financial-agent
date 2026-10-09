@@ -17,7 +17,7 @@
 - **Solution:** Auto-invoke quantitative team (market-regime, sector-rotation, time-horizon) as parallel steps in analysis workflow; inject results into analysis prompt as market context
 - **Value:** User gets complete picture (company + market + sector + regime) without knowing what to ask for; differentiates from chat-based tools
 - **Prereqs:** Quantitative team already exists ✅; needs workflow orchestration update in `lib/agents/workflows.ts`
-- **Status:** 🔴 READY TO START — minimal code change, high impact
+- **Status:** ⛔ BLOCKED — the workflow consumes ticker/peers/run ID, while the deterministic market schema requires caller-supplied aligned benchmark and sector histories. No provider source, access rights, incremental cost, or deployment requirement is confirmed; do not fetch market data or invent histories until those are resolved.
 
 ### 1. Multi-Asset Quantitative Engine Foundation
 **ID:** Multi-asset data + correlation + regime engine | **Effort:** ~3-4 weeks (phased)
@@ -29,10 +29,10 @@
   - Phase 4: Multi-asset optimization (Black-Litterman with regime priors, cross-asset constraints)
 - **Value:** Enables all multi-asset workflows (Macro Allocation, Risk Budgeting, Portfolio Construction beyond equities)
 - **Prereqs:** 
-  - Data providers: FRED (rates), Treasury (yields), commodity/FX APIs (Alpha Vantage, Twelve Data)
+  - Data providers: FRED (rates), Treasury (yields), commodity/FX APIs (Alpha Vantage, Twelve Data); source access, rights, cost, and deployment requirements must be confirmed before integration.
   - Schema changes: `market` input to accept multi-asset histories, not just equity proxies
   - Correlation engine extension in `lib/portfolio/risk.ts` / `lib/market/analysis.ts`
-- **Status:** 🟡 NEEDS ARCHITECTURE DESIGN — start Phase 1 data integration now
+- **Status:** 🟡 NEEDS ARCHITECTURE DESIGN — Phase 1 provider/data integration is on hold pending confirmed source access, rights, cost, and deployment requirements.
 
 ---
 
@@ -139,9 +139,9 @@ These are the highest-impact items to work on **now**. They leverage existing in
 
 ## P0 — Reliability And Safety (Infrastructure)
 
-- [ ] Persist scheduled daily-screening run statuses, results and reports; add owner-scoped history/UI and retention.
+- [ ] Persist scheduled daily-screening run statuses, results and reports; add owner-scoped history/UI and retention. **Blocked on ownership semantics:** the cron currently runs fixed global screens, but persisted history is per-user. It also passes the literal `daily-screening` as a run ID to step persistence without creating a parent run; `AgentRunStep` has a foreign key to `AgentRun`.
 - [ ] Implement scheduled-monitoring stale-data gating, exchange-session/holiday policy, shared provider quotas and concurrency limits.
-- [ ] Audit authorization and account isolation across portfolio, run, monitoring and remote-control routes; fix findings and document consent, secret handling, retention and backup/restore gaps.
+- [ ] Audit authorization and account isolation across portfolio, run, monitoring and remote-control routes; fix findings and document consent, secret handling, retention and backup/restore gaps. **Audit finding (2026-10-08):** credentials auth trusts the `fingerprint` cookie and maps accounts by its first 12 hex characters. Full-fingerprint lookup would strand existing accounts because only the prefix is stored; choose an account continuity/recovery path before changing auth. No dedicated remote-control API route was found; deployed Inngest signature verification was not tested.
 - [ ] Add health signals for missed, failed or stale runs, provider/quota failures, notification failures and missing Inngest configuration; document recovery procedures.
 
 ## P1 — Existing Capability Improvements

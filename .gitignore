@@ -47,3 +47,4 @@ yarn-error.log*
 quantitative*.json
 .tasks/*.md
 .tasks/TODO.md
+skills-lock.json

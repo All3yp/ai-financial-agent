@@ -2,9 +2,9 @@
 
 ## Overview
 
-User-facing documentation: [User Guide](docs/GUIA_DO_USUARIO.md),
-[Architecture And Agents](docs/ARQUITETURA_E_AGENTES.md), and
-[Runnable Fixture Instructions](docs/exemplos/README.md). These guides describe
+User-facing documentation: [User Guide](docs/USER_GUIDE.md),
+[Architecture And Agents](docs/AGENT_ARCHITECTURE.md), and
+[Runnable Fixture Instructions](docs/examples/README.md). These guides describe
 commands, inputs, actual agent execution, privacy and current limitations.
 
 `.github/copilot-instructions.md` and `.github/agents/*.agent.md` are development-time Copilot instructions and personas, not runtime financial-agent registration. Verify application capabilities in code and document them in the guides under `docs/`. `.tasks/TODO.md` owns current task and status tracking.
@@ -119,7 +119,7 @@ await requestMonitoring([{ ticker: 'AAPL', costBasis: 150, shares: 10 }], userId
 
 ### Provider Selection
 
-See [Data Provider Guide](docs/PROVEDORES_DE_DADOS.md) for current adapters and
+See [Data Provider Guide](docs/DATA_PROVIDERS.md) for current adapters and
 proposed EODHD, yfinance, Nasdaq Data Link, CoinGecko and GDELT integrations.
 These candidates are not selectable providers yet. Parquet/DuckDB and a custom
 MCP server are architectural options, not implemented infrastructure.
